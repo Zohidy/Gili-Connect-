@@ -1,0 +1,5 @@
+{
+  "name": "Gili Connect",
+  "description": "A modern social media hub for Gili Trawangan community updates, fastboat status, and island vibes.",
+  "requestFramePermissions": ["geolocation"]
+}

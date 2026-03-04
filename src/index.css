@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  
+  --color-ocean: #020617;
+  --color-reef: #0F172A;
+  --color-sand-border: #1E293B;
+  --color-cyan-water: #22D3EE;
+  --color-sunset: #FACC15;
+}
+
+@layer base {
+  body {
+    @apply bg-ocean text-[#F8FAFC] font-sans antialiased;
+  }
+}
+
+.glass {
+  @apply bg-reef/40 backdrop-blur-md border border-sand-border;
+}
+
+.radial-glow {
+  background: radial-gradient(circle at center, rgba(34, 211, 238, 0.15) 0%, transparent 70%);
+}
+
+.sunset-glow {
+  background: radial-gradient(circle at center, rgba(250, 204, 21, 0.1) 0%, transparent 70%);
+}
