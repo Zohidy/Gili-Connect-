@@ -43,11 +43,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
       >
         <div className="absolute -top-20 -right-20 w-40 h-40 bg-cyan-water/10 rounded-full blur-3xl" />
         
-        <h2 className="text-3xl font-display font-bold mb-2">{mode === 'login' ? 'Welcome Back' : 'Join the Island'}</h2>
-        <p className="text-secondary-text mb-8">{mode === 'login' ? 'See what\'s happening on Gili T.' : 'Start sharing your island journey.'}</p>
+        <h2 className="text-3xl font-bold mb-2 text-primary">{mode === 'login' ? 'Welcome Back' : 'Join the Island'}</h2>
+        <p className="text-secondary mb-8">{mode === 'login' ? 'See what\'s happening on Gili T.' : 'Start sharing your island journey.'}</p>
         
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs p-3 rounded-xl mb-6">
+          <div className="error-message text-xs p-3 rounded-xl mb-6">
             {error}
           </div>
         )}
@@ -55,50 +55,50 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'signup' && (
             <div>
-              <label className="block text-xs font-bold text-secondary-text uppercase mb-1">Full Name</label>
+              <label className="block text-xs font-semibold text-secondary uppercase mb-1">Full Name</label>
               <input 
                 type="text" 
                 required 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-ocean border border-sand-border rounded-xl px-4 py-3 focus:border-cyan-water outline-none transition-colors" 
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors" 
                 placeholder="John Doe" 
               />
             </div>
           )}
           <div>
-            <label className="block text-xs font-bold text-secondary-text uppercase mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-secondary uppercase mb-1">Email Address</label>
             <input 
               type="email" 
               required 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-ocean border border-sand-border rounded-xl px-4 py-3 focus:border-cyan-water outline-none transition-colors" 
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors" 
               placeholder="name@example.com" 
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-secondary-text uppercase mb-1">Password</label>
+            <label className="block text-xs font-semibold text-secondary uppercase mb-1">Password</label>
             <input 
               type="password" 
               required 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-ocean border border-sand-border rounded-xl px-4 py-3 focus:border-cyan-water outline-none transition-colors" 
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors" 
               placeholder="••••••••" 
             />
           </div>
           
           {mode === 'signup' && (
             <div>
-              <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Island Role</label>
+              <label className="block text-xs font-semibold text-secondary uppercase mb-2">Island Role</label>
               <div className="grid grid-cols-3 gap-2">
-                {(['Tourist', 'Local', 'Business'] as IslandRole[]).map(r => (
+                {(['Tourist', 'Local', 'Business', 'Moderator', 'Supporter'] as IslandRole[]).map(r => (
                   <button
                     key={r}
                     type="button"
                     onClick={() => setRole(r)}
-                    className={`py-2 rounded-lg text-xs font-bold border transition-all ${role === r ? 'bg-cyan-water/10 border-cyan-water text-cyan-water' : 'border-sand-border text-secondary-text hover:border-white/20'}`}
+                    className={`py-2 rounded-xl text-xs font-semibold border transition-all ${role === r ? 'bg-accent/10 border-accent text-accent' : 'border-border text-secondary hover:border-accent/50'}`}
                   >
                     {r}
                   </button>
@@ -110,7 +110,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-cyan-water text-ocean py-4 rounded-xl font-bold mt-4 hover:bg-cyan-water/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full btn-primary py-4 rounded-xl font-semibold mt-4"
           >
             {loading ? 'Processing...' : (mode === 'login' ? 'Sign In' : 'Create Account')}
           </button>
@@ -118,10 +118,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
 
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-sand-border"></div>
+            <div className="w-full border-t border-border"></div>
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-reef px-2 text-secondary-text">Or continue with</span>
+            <span className="bg-surface px-2 text-secondary">Or continue with</span>
           </div>
         </div>
 
@@ -138,7 +138,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
             }
           }}
           disabled={loading}
-          className="w-full glass border-sand-border hover:border-white/20 py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all disabled:opacity-50"
+          className="w-full btn-secondary py-4 rounded-xl font-semibold flex items-center justify-center gap-3"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path

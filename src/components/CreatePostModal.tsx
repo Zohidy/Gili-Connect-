@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Image as ImageIcon, Loader2, Trash2 } from 'lucide-react';
-import { PostCategory } from '../types';
+import { X, Image as ImageIcon, Loader2, Trash2, MapPin, Smile, Hash, Send } from 'lucide-react';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
+import { PostCategory, User } from '../types';
 import { uploadFile } from '../services/storageService';
 
 interface CreatePostModalProps {
@@ -13,9 +14,19 @@ interface CreatePostModalProps {
   onImageChange: (image: string) => void;
   category: PostCategory;
   onCategoryChange: (category: PostCategory) => void;
-  onSubmit: () => Promise<void>;
-  userId: string;
+  onSubmit: (location?: string) => Promise<void>;
+  user: User | null;
+  setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
 }
+
+const CATEGORIES: { id: PostCategory; label: string; icon: string }[] = [
+  { id: 'News', label: 'News', icon: '📢' },
+  { id: 'Party', label: 'Party', icon: '🎉' },
+  { id: 'Fastboat', label: 'Fastboat', icon: '🚤' },
+  { id: 'Safety', label: 'Safety', icon: '🛡️' },
+  { id: 'Food', label: 'Food', icon: '🍱' },
+  { id: 'Marketplace', label: 'Market', icon: '🛒' },
+];
 
 const CreatePostModal: React.FC<CreatePostModalProps> = ({
   show,
@@ -27,17 +38,21 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
   category,
   onCategoryChange,
   onSubmit,
-  userId
+  user,
+  setNotification
 }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showLocationInput, setShowLocationInput] = useState(false);
+  const [location, setLocation] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_CHARS = 280;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleFileChange = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file.');
+      setNotification({ message: 'Please upload an image file.', type: 'error' });
       return;
     }
 
@@ -45,11 +60,40 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
       setIsUploading(true);
       const url = await uploadFile(file);
       onImageChange(url);
+      setNotification({ message: 'Successfully uploaded image.', type: 'success' });
     } catch (error) {
       console.error("Error uploading post image:", error);
-      alert("Failed to upload image. Please try again.");
+      setNotification({ message: error instanceof Error ? error.message : 'Failed to upload image.', type: 'error' });
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFileChange(file);
+  };
+
+  const handlePostSubmit = async () => {
+    if (!content.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(location);
+      setLocation('');
+      setShowLocationInput(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -62,86 +106,249 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-ocean/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
           />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="glass w-full max-w-lg p-6 rounded-3xl relative z-10"
+            className="card w-full max-w-xl rounded-3xl relative z-10 overflow-hidden shadow-2xl"
           >
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold">Create Post</h3>
-              <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg"><X className="w-5 h-5" /></button>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <button 
+                onClick={onClose} 
+                className="p-2 hover:bg-border/50 rounded-full text-secondary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-base font-bold text-primary">Create New Post</h3>
+              <div className="w-9" /> {/* Spacer */}
             </div>
             
-            <textarea 
-              value={content}
-              onChange={(e) => onContentChange(e.target.value)}
-              placeholder="What's happening on Gili T?"
-              className="w-full h-32 bg-ocean border border-sand-border rounded-2xl p-4 outline-none focus:border-cyan-water transition-colors resize-none mb-4"
-            />
+            <div 
+              className={`p-5 transition-colors ${isDragging ? 'bg-accent/5' : ''}`}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+            >
+              {/* User Info & Textarea */}
+              <div className="flex gap-4 mb-4">
+                <img 
+                  src={user?.avatar} 
+                  alt={user?.name} 
+                  className="w-12 h-12 rounded-full border border-border object-cover flex-shrink-0"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="flex-1">
+                  <textarea 
+                    value={content}
+                    onChange={(e) => onContentChange(e.target.value.slice(0, MAX_CHARS))}
+                    placeholder="What's happening on Gili T?"
+                    className="w-full h-32 bg-transparent text-lg text-primary placeholder:text-secondary/50 outline-none resize-none pt-2"
+                    autoFocus
+                  />
+                </div>
+              </div>
 
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Image</label>
-              
-              {image ? (
-                <div className="relative rounded-2xl overflow-hidden border border-sand-border group h-48">
+              {/* Drag & Drop Indicator */}
+              {isDragging && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                  <div className="bg-accent text-white px-6 py-3 rounded-full font-bold shadow-xl flex items-center gap-2 animate-bounce">
+                    <ImageIcon className="w-5 h-5" />
+                    Drop image to upload
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
+              {image && (
+                <div className="relative rounded-2xl overflow-hidden border border-border group mb-4 max-h-72">
                   <img src={image} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   <button 
                     onClick={() => onImageChange('')}
-                    className="absolute top-2 right-2 p-2 bg-red-500/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-              ) : (
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="w-full h-32 border-2 border-dashed border-sand-border rounded-2xl flex flex-col items-center justify-center gap-2 hover:border-cyan-water transition-colors text-secondary-text disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <Loader2 className="w-8 h-8 animate-spin" />
-                  ) : (
-                    <>
-                      <ImageIcon className="w-8 h-8 opacity-20" />
-                      <span className="text-xs font-bold uppercase">Click to upload photo</span>
-                    </>
-                  )}
-                </button>
               )}
+
+              {/* Upload Loading */}
+              {isUploading && (
+                <div className="h-32 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2 mb-4 bg-surface/50">
+                  <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                  <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Uploading Image...</span>
+                </div>
+              )}
+
+              {/* Location Input */}
+              <AnimatePresence>
+                {showLocationInput && (
+                  <motion.div 
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="mb-4 overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2 bg-surface border border-border rounded-xl px-3 py-2">
+                      <MapPin className="w-4 h-4 text-accent" />
+                      <input 
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="Where are you on Gili T?"
+                        className="flex-1 bg-transparent text-sm text-primary outline-none"
+                        autoFocus
+                      />
+                      <button onClick={() => { setLocation(''); setShowLocationInput(false); }} className="text-secondary hover:text-primary">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Category Selection */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Hash className="w-4 h-4 text-accent" />
+                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">Select Category</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => onCategoryChange(cat.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold border transition-all duration-200 ${
+                        category === cat.id 
+                          ? 'bg-accent text-white border-accent shadow-lg shadow-accent/20 scale-105' 
+                          : 'bg-surface border-border text-secondary hover:border-accent/50 hover:bg-border/30'
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Toolbar & Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-border">
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading || !!image}
+                    className="p-2.5 text-accent hover:bg-accent/10 rounded-full transition-colors disabled:opacity-30"
+                    title="Add Photo"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setShowLocationInput(!showLocationInput)}
+                    className={`p-2.5 rounded-full transition-colors ${showLocationInput ? 'bg-accent/10 text-accent' : 'text-accent hover:bg-accent/10'}`} 
+                    title="Add Location"
+                  >
+                    <MapPin className="w-5 h-5" />
+                  </button>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className={`p-2.5 rounded-full transition-colors ${showEmojiPicker ? 'bg-accent/10 text-accent' : 'text-accent hover:bg-accent/10'}`} 
+                      title="Add Emoji"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                    
+                    <AnimatePresence>
+                      {showEmojiPicker && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute bottom-full left-0 mb-4 z-50"
+                        >
+                          <div className="shadow-2xl rounded-2xl overflow-hidden border border-border">
+                            <EmojiPicker 
+                              onEmojiClick={(emojiData) => {
+                                onContentChange(content + emojiData.emoji);
+                                setShowEmojiPicker(false);
+                              }}
+                              theme={document.documentElement.classList.contains('dark') ? Theme.DARK : Theme.LIGHT}
+                              width={320}
+                              height={400}
+                              lazyLoadEmojis={true}
+                              skinTonesDisabled={true}
+                              searchDisabled={false}
+                            />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="relative w-6 h-6 flex items-center justify-center">
+                    <svg className="w-full h-full -rotate-90">
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="text-border"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray={2 * Math.PI * 10}
+                        strokeDashoffset={2 * Math.PI * 10 * (1 - content.length / MAX_CHARS)}
+                        className={`transition-all duration-300 ${
+                          content.length >= MAX_CHARS ? 'text-red-500' : 
+                          content.length >= MAX_CHARS * 0.8 ? 'text-orange-500' : 'text-accent'
+                        }`}
+                      />
+                    </svg>
+                    {content.length >= MAX_CHARS * 0.8 && (
+                      <span className={`absolute text-[8px] font-bold ${content.length >= MAX_CHARS ? 'text-red-500' : 'text-secondary'}`}>
+                        {MAX_CHARS - content.length}
+                      </span>
+                    )}
+                  </div>
+                  <button 
+                    onClick={handlePostSubmit}
+                    disabled={isUploading || isSubmitting || !content.trim()}
+                    className="flex items-center gap-2 btn-primary px-6 py-2.5 rounded-full font-bold disabled:opacity-50 disabled:cursor-not-allowed group"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <span>Post</span>
+                        <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               <input 
                 type="file"
                 ref={fileInputRef}
-                onChange={handleFileChange}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileChange(file);
+                }}
                 className="hidden"
                 accept="image/*"
               />
             </div>
-            
-            <div className="mb-6">
-              <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Category</label>
-              <div className="flex flex-wrap gap-2">
-                {(['News', 'Party', 'Fastboat', 'Safety', 'Food', 'Marketplace'] as PostCategory[]).map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => onCategoryChange(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${category === cat ? 'bg-cyan-water/10 border-cyan-water text-cyan-water' : 'border-sand-border text-secondary-text hover:border-white/20'}`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <button 
-              onClick={onSubmit}
-              disabled={isUploading || !content.trim()}
-              className="w-full bg-cyan-water text-ocean py-4 rounded-xl font-bold hover:bg-cyan-water/90 transition-colors disabled:opacity-50"
-            >
-              Post Update
-            </button>
           </motion.div>
         </div>
       )}

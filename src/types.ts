@@ -1,56 +1,74 @@
-export type IslandRole = 'Tourist' | 'Local' | 'Business' | 'Admin';
+import { Timestamp } from 'firebase/firestore';
+
+export type IslandRole = 'Tourist' | 'Local' | 'Business' | 'Admin' | 'Moderator' | 'Supporter';
+export type PostCategory = 'Party' | 'Fastboat' | 'Safety' | 'Food' | 'News' | 'Marketplace' | 'Gili Vibes';
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email: string;
-  role: IslandRole;
-  avatar: string;
-  badges: string[];
+  createdAt: Timestamp;
+  displayName?: string;
   bio?: string;
-  location?: string;
-  coverImage?: string;
-  joinedAt?: string;
+  profilePictureUrl?: string;
+  role?: IslandRole;
 }
-
-export type PostCategory = 'Party' | 'Fastboat' | 'Safety' | 'Food' | 'News' | 'Marketplace';
 
 export interface Post {
   id: string;
   userId: string;
-  userName: string;
-  userAvatar: string;
-  timestamp: string;
-  category: PostCategory;
   content: string;
-  image?: string;
-  likes: number;
-  likedBy?: string[];
-  parentId?: string;
-  replyCount: number;
+  createdAt: Timestamp;
+  mediaUrl?: string;
+  mediaType?: string;
+  category?: PostCategory;
 }
 
-export interface IslandSpot {
+export interface Like {
   id: string;
-  name: string;
-  category: string;
-  status: 'Open' | 'Closed';
-  location: string;
-}
-
-export interface MarketplaceItem {
-  id: string;
-  title: string;
-  price: string;
-  type: 'Selling' | 'Lost' | 'Found';
-  image: string;
+  userId: string;
+  postId: string;
+  createdAt: Timestamp;
 }
 
 export interface Comment {
   id: string;
   userId: string;
-  userName: string;
-  userAvatar: string;
-  content: string;
+  postId: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface Follow {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: Timestamp;
+}
+
+export interface Block {
+  id: string;
+  blockerId: string;
+  blockedId: string;
+  createdAt: Timestamp;
+}
+
+export interface Report {
+  id: string;
+  postId: string;
+  reporterId: string;
+  reason: string;
   timestamp: string;
+  status: 'pending' | 'reviewed' | 'resolved';
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'like' | 'reply' | 'follow';
+  senderId: string;
+  senderName: string;
+  postId?: string;
+  timestamp: string;
+  read: boolean;
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Ship, LogOut } from 'lucide-react';
+import { Ship, LogOut, Bell } from 'lucide-react';
 import { User } from '../types';
 
 interface NavbarProps {
@@ -9,38 +9,70 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate }) => (
-  <nav className="fixed top-0 left-0 right-0 z-50 glass px-4 py-3 flex items-center justify-between">
-    <div className="flex items-center gap-2 cursor-pointer" onClick={() => onNavigate('landing')}>
-      <div className="w-10 h-10 bg-gradient-to-br from-cyan-water to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-water/20">
-        <Ship className="text-white w-6 h-6" />
+  <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
+    <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onNavigate('feed')}>
+        <div className="w-8 h-8 flex items-center justify-center">
+          <Ship className="text-primary w-6 h-6 group-hover:scale-110 transition-transform" />
+        </div>
+        <span className="text-lg font-bold tracking-tight text-primary">Gili</span>
       </div>
-      <span className="text-xl font-display font-bold tracking-tight bg-gradient-to-r from-white to-cyan-water bg-clip-text text-transparent">Gili Connect</span>
+      
+      {user && (
+        <div className="hidden md:flex items-center gap-1">
+          <button 
+            onClick={() => onNavigate('feed')}
+            className="px-4 py-2 text-sm font-bold text-secondary hover:text-accent transition-colors uppercase tracking-wider"
+          >
+            Feed
+          </button>
+          <button 
+            onClick={() => onNavigate('profile')}
+            className="px-4 py-2 text-sm font-bold text-secondary hover:text-accent transition-colors uppercase tracking-wider"
+          >
+            Profile
+          </button>
+          {user.role === 'Admin' && (
+            <button 
+              onClick={() => onNavigate('admin')}
+              className="px-4 py-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-wider"
+            >
+              Admin
+            </button>
+          )}
+        </div>
+      )}
     </div>
-
-    {user ? (
-      <div className="hidden md:flex items-center gap-8">
-        <button onClick={() => onNavigate('feed')} className="text-sm font-medium hover:text-cyan-water transition-colors">Feed</button>
-        <button onClick={() => onNavigate('directory')} className="text-sm font-medium hover:text-cyan-water transition-colors">Directory</button>
-        <button onClick={() => onNavigate('market')} className="text-sm font-medium hover:text-cyan-water transition-colors">Market</button>
-      </div>
-    ) : null}
 
     <div className="flex items-center gap-4">
       {user ? (
         <div className="flex items-center gap-3">
-          <div className="hidden sm:block text-right">
-            <p className="text-xs font-bold">{user.name}</p>
-            <p className="text-[10px] text-secondary-text">{user.role}</p>
+          <button onClick={() => onNavigate('notification')} className="p-2 text-secondary hover:text-accent transition-colors">
+            <Bell className="w-5 h-5" />
+          </button>
+          <div 
+            className="flex items-center gap-2 cursor-pointer group"
+            onClick={() => onNavigate('profile')}
+          >
+            <img 
+              src={user.avatar} 
+              alt={user.name} 
+              className="w-9 h-9 rounded-full border border-border group-hover:border-accent transition-colors object-cover" 
+              referrerPolicy="no-referrer" 
+            />
+            <span className="hidden sm:block text-sm font-bold text-primary group-hover:text-accent transition-colors">
+              {user.name.split(' ')[0]}
+            </span>
           </div>
-          <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full border border-cyan-water/30" referrerPolicy="no-referrer" />
-          <button onClick={onLogout} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-secondary-text hover:text-red-400">
-            <LogOut className="w-5 h-5" />
+          <div className="w-px h-4 bg-border mx-1" />
+          <button onClick={onLogout} className="p-2 hover:bg-red-500/10 rounded-full transition-colors text-secondary hover:text-red-500" title="Logout">
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <button onClick={() => onNavigate('login')} className="text-sm font-medium px-4 py-2 hover:text-cyan-water transition-colors">Login</button>
-          <button onClick={() => onNavigate('signup')} className="text-sm font-medium bg-cyan-water text-ocean px-4 py-2 rounded-lg hover:bg-cyan-water/90 transition-colors">Sign Up</button>
+          <button onClick={() => onNavigate('login')} className="text-sm font-medium px-3 py-1.5 text-secondary hover:text-primary transition-colors">Login</button>
+          <button onClick={() => onNavigate('signup')} className="text-sm font-medium btn-primary px-3 py-1.5 rounded-full">Sign Up</button>
         </div>
       )}
     </div>

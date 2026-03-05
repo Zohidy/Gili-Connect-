@@ -1,31 +1,99 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
   
-  --color-ocean: #020617;
-  --color-reef: #0F172A;
-  --color-sand-border: #1E293B;
-  --color-cyan-water: #22D3EE;
-  --color-sunset: #FACC15;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+
+  --color-success-bg: var(--success-bg);
+  --color-success-text: var(--success-text);
+  --color-error-bg: var(--error-bg);
+  --color-error-text: var(--error-text);
+}
+
+:root {
+  --background: #f5f5f5;
+  --surface: #ffffff;
+  --primary: #171717;
+  --secondary: #737373;
+  --border: #e5e5e5;
+  --accent: #171717;
+
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --error-bg: #fee2e2;
+  --error-text: #991b1b;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --surface: #171717;
+  --primary: #fafafa;
+  --secondary: #a3a3a3;
+  --border: #262626;
+  --accent: #fafafa;
+
+  --success-bg: #064e3b;
+  --success-text: #34d399;
+  --error-bg: #7f1d1d;
+  --error-text: #f87171;
 }
 
 @layer base {
   body {
-    @apply bg-ocean text-[#F8FAFC] font-sans antialiased;
+    @apply bg-background text-primary font-sans antialiased;
   }
 }
 
-.glass {
-  @apply bg-reef/40 backdrop-blur-md border border-sand-border;
+.card {
+  @apply bg-surface border border-border rounded-2xl shadow-sm;
 }
 
-.radial-glow {
-  background: radial-gradient(circle at center, rgba(34, 211, 238, 0.15) 0%, transparent 70%);
+.badge-success {
+  @apply bg-success-bg text-success-text;
 }
 
-.sunset-glow {
-  background: radial-gradient(circle at center, rgba(250, 204, 21, 0.1) 0%, transparent 70%);
+.badge-error {
+  @apply bg-error-bg text-error-text;
 }
+
+.badge-party { @apply bg-purple-100 text-purple-700; }
+.dark .badge-party { @apply bg-purple-900 text-purple-300; }
+
+.badge-fastboat { @apply bg-blue-100 text-blue-700; }
+.dark .badge-fastboat { @apply bg-blue-900 text-blue-300; }
+
+.badge-safety { @apply bg-red-100 text-red-700; }
+.dark .badge-safety { @apply bg-red-900 text-red-300; }
+
+.badge-role-admin { @apply bg-purple-100 text-purple-700 border-purple-200; }
+.dark .badge-role-admin { @apply bg-purple-900 text-purple-300 border-purple-800; }
+
+.badge-role-moderator { @apply bg-red-100 text-red-700 border-red-200; }
+.dark .badge-role-moderator { @apply bg-red-900 text-red-300 border-red-800; }
+
+.badge-role-supporter { @apply bg-yellow-100 text-yellow-700 border-yellow-200; }
+.dark .badge-role-supporter { @apply bg-yellow-900 text-yellow-300 border-yellow-800; }
+
+.badge-role-local { @apply bg-blue-100 text-blue-700 border-blue-200; }
+.dark .badge-role-local { @apply bg-blue-900 text-blue-300 border-blue-800; }
+
+.badge-role-business { @apply bg-slate-100 text-slate-700 border-slate-200; }
+.dark .badge-role-business { @apply bg-slate-800 text-slate-300 border-slate-700; }
+
+.badge-role-tourist { @apply bg-emerald-100 text-emerald-700 border-emerald-200; }
+.dark .badge-role-tourist { @apply bg-emerald-900 text-emerald-300 border-emerald-800; }
+
+.badge-default { @apply bg-slate-100 text-slate-700; }
+.dark .badge-default { @apply bg-slate-800 text-slate-300; }
+
+.error-message { @apply bg-error-bg text-error-text; }
+
+.btn-primary { @apply bg-primary text-background hover:bg-primary/90 disabled:opacity-50 transition-colors; }
+.btn-secondary { @apply bg-surface border border-border text-secondary hover:bg-background transition-colors; }

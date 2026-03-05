@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- HELPER FUNCTIONS ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+
+    // --- COLLECTIONS ---
+
+    // Users collection
+    match /users/{userId} {
+      // Profiles are public
+      allow read: if true;
+      
+      // Users can only create their own profile
+      allow create: if isOwner(userId);
+      
+      // Users can update their own profile, but cannot change sensitive fields like role or badges
+      allow update: if isAdmin() || (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'badges', 'id', 'email'])
+      );
+      
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // Posts collection
+    match /posts/{postId} {
+      // Posts are public
+      allow read: if true;
+      
+      // Must be signed in and userId must match auth.uid
+      allow create: if isSignedIn() 
+                    && request.resource.data.userId == request.auth.uid;
+      
+      // Update logic
+      allow update: if isAdmin() || (
+        isSignedIn() && (
+          // Owner can update their post content, but not the userId or creation date
+          (isOwner(resource.data.userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'createdAt'])) ||
+          // Any authenticated user can interact with likes and reply counts
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'replyCount']))
+        )
+      );
+      
+      // Only owner or admin can delete
+      allow delete: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      // Only admins can see reports
+      allow read: if isAdmin();
+      
+      // Any signed-in user can create a report, but must be the reporter
+      allow create: if isSignedIn() 
+                    && request.resource.data.reporterId == request.auth.uid
+                    && request.resource.data.status == 'pending';
+                    
+      // Only admins can manage reports
+      allow update, delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isSignedIn() && (resource == null || request.auth.uid == resource.data.userId);
+      
+      // Only system (or authenticated users) can create notifications
+      allow create: if isSignedIn();
+      
+      // Users can mark their own notifications as read
+      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
+      
+      // Only admins can delete notifications
+      allow delete: if isAdmin();
+    }
+  }
+}

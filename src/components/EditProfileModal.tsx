@@ -9,19 +9,23 @@ interface EditProfileModalProps {
   onClose: () => void;
   user: User;
   onUpdate: (data: Partial<User>) => Promise<void>;
+  setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
 const EditProfileModal: React.FC<EditProfileModalProps> = ({
   show,
   onClose,
   user,
-  onUpdate
+  onUpdate,
+  setNotification
 }) => {
   const [name, setName] = useState(user.name);
   const [bio, setBio] = useState(user.bio || '');
   const [location, setLocation] = useState(user.location || '');
   const [avatar, setAvatar] = useState(user.avatar);
   const [coverImage, setCoverImage] = useState(user.coverImage || '');
+  const [giliConnection, setGiliConnection] = useState(user.giliConnection || '');
+  const [interests, setInterests] = useState(user.interests?.join(', ') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -35,12 +39,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
     // Basic validation
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size should be less than 5MB.');
+      setNotification({ message: 'Please upload an image file.', type: 'error' });
       return;
     }
 
@@ -52,9 +51,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
       
       if (type === 'cover') setCoverImage(url);
       else setAvatar(url);
+      setNotification({ message: `Successfully uploaded ${type}.`, type: 'success' });
     } catch (error) {
       console.error(`Error uploading ${type}:`, error);
-      alert(`Failed to upload ${type}. Please try again.`);
+      setNotification({ message: error instanceof Error ? error.message : `Failed to upload ${type}.`, type: 'error' });
     } finally {
       if (type === 'cover') setUploadingCover(false);
       else setUploadingAvatar(false);
@@ -70,11 +70,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         bio,
         location,
         avatar,
-        coverImage
+        coverImage,
+        giliConnection,
+        interests: interests.split(',').map(i => i.trim()).filter(i => i !== '')
       });
+      setNotification({ message: 'Profile updated successfully!', type: 'success' });
       onClose();
     } catch (error) {
       console.error("Error updating profile:", error);
+      setNotification({ message: 'Failed to update profile.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -89,31 +93,31 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-ocean/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
           />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="glass w-full max-w-lg rounded-3xl relative z-10 overflow-hidden"
+            className="card w-full max-w-lg rounded-3xl relative z-10 overflow-hidden"
           >
-            <div className="flex items-center justify-between p-6 border-b border-sand-border">
-              <h3 className="text-xl font-bold">Edit Profile</h3>
-              <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg"><X className="w-5 h-5" /></button>
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h3 className="text-xl font-bold text-primary">Edit Profile</h3>
+              <button onClick={onClose} className="p-2 hover:bg-border/50 rounded-lg text-secondary"><X className="w-5 h-5" /></button>
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Cover Image */}
               <div>
-                <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Cover Image</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Cover Image</label>
                 <div 
                   onClick={() => coverInputRef.current?.click()}
-                  className="relative h-32 bg-white/5 rounded-2xl overflow-hidden border border-sand-border group cursor-pointer"
+                  className="relative h-32 bg-background rounded-2xl overflow-hidden border border-border group cursor-pointer"
                 >
                   {coverImage ? (
                     <img src={coverImage} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-secondary-text">
+                    <div className="w-full h-full flex items-center justify-center text-secondary">
                       <Camera className="w-8 h-8 opacity-20" />
                     </div>
                   )}
@@ -123,7 +127,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ) : (
                       <>
                         <Upload className="w-6 h-6 text-white" />
-                        <span className="text-[10px] font-bold text-white uppercase">Upload Cover</span>
+                        <span className="text-[10px] font-semibold text-white uppercase">Upload Cover</span>
                       </>
                     )}
                   </div>
@@ -147,7 +151,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     <img 
                       src={avatar} 
                       alt="Avatar" 
-                      className="w-24 h-24 rounded-full border-4 border-ocean object-cover"
+                      className="w-24 h-24 rounded-full border-4 border-surface object-cover"
                       referrerPolicy="no-referrer"
                     />
                     {uploadingAvatar && (
@@ -171,49 +175,80 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               {/* Name */}
               <div>
-                <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Display Name</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Display Name</label>
                 <input 
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-ocean border border-sand-border rounded-xl px-4 py-3 focus:border-cyan-water outline-none transition-colors"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors text-primary"
                   required
                 />
               </div>
 
               {/* Bio */}
               <div>
-                <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Bio</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Bio</label>
                 <div className="relative">
-                  <AlignLeft className="absolute left-4 top-4 w-4 h-4 text-secondary-text" />
+                  <AlignLeft className="absolute left-4 top-4 w-4 h-4 text-secondary" />
                   <textarea 
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     placeholder="Tell us about yourself..."
-                    className="w-full h-24 bg-ocean border border-sand-border rounded-xl pl-12 pr-4 py-3 focus:border-cyan-water outline-none transition-colors resize-none"
+                    className="w-full h-24 bg-background border border-border rounded-xl pl-12 pr-4 py-3 focus:border-accent outline-none transition-colors resize-none text-primary"
                   />
                 </div>
               </div>
 
               {/* Location */}
               <div>
-                <label className="block text-xs font-bold text-secondary-text uppercase mb-2">Location</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Location</label>
                 <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-text" />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
                   <input 
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="e.g. Gili Trawangan, Indonesia"
-                    className="w-full bg-ocean border border-sand-border rounded-xl pl-12 pr-4 py-3 focus:border-cyan-water outline-none transition-colors"
+                    className="w-full bg-background border border-border rounded-xl pl-12 pr-4 py-3 focus:border-accent outline-none transition-colors text-primary"
                   />
                 </div>
+              </div>
+
+              {/* Gili Connection */}
+              <div>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Connection to Gili Trawangan</label>
+                <select 
+                  value={giliConnection}
+                  onChange={(e) => setGiliConnection(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors text-primary"
+                >
+                  <option value="">Select your connection...</option>
+                  <option value="Local Resident">Local Resident</option>
+                  <option value="Expat Resident">Expat Resident</option>
+                  <option value="Frequent Visitor">Frequent Visitor</option>
+                  <option value="First Time Visitor">First Time Visitor</option>
+                  <option value="Business Owner">Business Owner</option>
+                  <option value="Digital Nomad">Digital Nomad</option>
+                  <option value="Diving Professional">Diving Professional</option>
+                </select>
+              </div>
+
+              {/* Interests */}
+              <div>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Interests (comma separated)</label>
+                <input 
+                  type="text"
+                  value={interests}
+                  onChange={(e) => setInterests(e.target.value)}
+                  placeholder="e.g. Diving, Partying, Yoga, Food"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors text-primary"
+                />
               </div>
 
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-cyan-water text-ocean py-4 rounded-xl font-bold hover:bg-cyan-water/90 transition-colors disabled:opacity-50"
+                className="w-full btn-primary py-4 rounded-xl font-semibold"
               >
                 {isSubmitting ? 'Saving...' : 'Save Changes'}
               </button>

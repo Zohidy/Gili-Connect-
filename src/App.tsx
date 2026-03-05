@@ -7,9 +7,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   User as UserIcon, 
-  PlusSquare, 
-  MapPin, 
-  ShoppingBag
+  PlusSquare,
+  Users,
+  Bell,
+  Shield,
+  Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, googleProvider } from './firebase';
@@ -35,9 +37,12 @@ import {
   updateDoc,
   increment,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  limit,
+  getDocs,
+  where
 } from 'firebase/firestore';
-import { User, Post, IslandRole, PostCategory, IslandSpot, MarketplaceItem } from './types';
+import { User, Post, Notification } from './types';
 
 // Components
 import Navbar from './components/Navbar';
@@ -45,22 +50,61 @@ import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import PostCard from './components/PostCard';
 import Sidebar from './components/Sidebar';
-import DirectoryView from './components/DirectoryView';
-import MarketView from './components/MarketView';
 import CreatePostModal from './components/CreatePostModal';
 import ProfileView from './components/ProfileView';
+import PostSkeleton from './components/PostSkeleton';
+import AdminSettings from './components/AdminSettings';
+import NotificationsView from './components/NotificationsView';
+import { reportPost } from './services/reportService';
 
 export default function App() {
   const [view, setView] = useState('landing');
   const [user, setUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [spots, setSpots] = useState<IslandSpot[]>([]);
-  const [marketItems, setMarketItems] = useState<MarketplaceItem[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState<{ show: boolean; postId: string | null }>({ show: false, postId: null });
+  const [reportReason, setReportReason] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostImage, setNewPostImage] = useState('');
-  const [newPostCategory, setNewPostCategory] = useState<PostCategory>('News');
   const [initializing, setInitializing] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => 
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  // Clear notification after 3 seconds
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  useEffect(() => {
+    if (view !== 'profile') {
+      setSelectedUser(null);
+    }
+  }, [view]);
 
   // Auth Listener
   useEffect(() => {
@@ -74,12 +118,11 @@ export default function App() {
         } else {
           currentUserData = {
             id: firebaseUser.uid,
-            name: firebaseUser.displayName || 'Island Explorer',
+            username: firebaseUser.displayName || 'Island Explorer',
             email: firebaseUser.email || '',
-            role: 'Tourist',
-            avatar: firebaseUser.photoURL || `https://picsum.photos/seed/${firebaseUser.uid}/100`,
-            badges: ['Newcomer'],
-            joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+            createdAt: Timestamp.now(),
+            displayName: firebaseUser.displayName || 'Island Explorer',
+            profilePictureUrl: firebaseUser.photoURL || `https://picsum.photos/seed/${firebaseUser.uid}/100`,
           };
           await setDoc(doc(db, 'users', firebaseUser.uid), currentUserData);
         }
@@ -99,8 +142,33 @@ export default function App() {
       setInitializing(false);
     });
 
-    return () => unsubscribe();
-  }, []); // Empty dependency array to prevent multiple listeners
+    return unsubscribe;
+  }, []);
+
+  // Notifications Listener
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('userId', '==', user.id),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
+    
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      const userNotifications = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      setNotifications(userNotifications);
+    }, (error) => {
+      console.error("Notifications listener error:", error);
+    });
+
+    return unsubscribeNotifications;
+  }, [user]);
 
   // Posts Listener
   useEffect(() => {
@@ -121,45 +189,50 @@ export default function App() {
 
         return {
           id: doc.id,
-          ...data,
-          timestamp
+          userId: data.userId,
+          content: data.content,
+          createdAt: data.createdAt,
+          mediaUrl: data.mediaUrl,
+          mediaType: data.mediaType,
         } as Post;
       });
       setPosts(fetchedPosts);
+      setLoadingPosts(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Spots Listener
+  // Fetch Suggested Users
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'spots'), (snapshot) => {
-      const fetchedSpots = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IslandSpot));
-      setSpots(fetchedSpots);
-    });
-    return () => unsubscribe();
-  }, []);
+    const fetchUsers = async () => {
+      try {
+        const q = query(collection(db, 'users'), limit(5));
+        const snapshot = await getDocs(q);
+        const users = snapshot.docs
+          .map(doc => doc.data() as User)
+          .filter(u => u.id !== user?.id);
+        setSuggestedUsers(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
+    };
 
-  // Market Listener
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'market'), (snapshot) => {
-      const fetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MarketplaceItem));
-      setMarketItems(fetchedItems);
-    });
-    return () => unsubscribe();
-  }, []);
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
-  const handleAuth = async (email: string, pass: string, name?: string, role?: IslandRole) => {
+  const handleAuth = async (email: string, pass: string, name?: string) => {
     if (name) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const newUser: User = {
         id: userCredential.user.uid,
-        name: name,
+        username: name,
         email: email,
-        role: email === 'zohidi269@gmail.com' ? 'Admin' : (role || 'Tourist'),
-        avatar: `https://picsum.photos/seed/${userCredential.user.uid}/100`,
-        badges: ['Newcomer'],
-        joinedAt: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        createdAt: Timestamp.now(),
+        displayName: name,
+        profilePictureUrl: `https://picsum.photos/seed/${userCredential.user.uid}/100`,
       };
       await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
       setUser(newUser);
@@ -180,31 +253,20 @@ export default function App() {
     setView('landing');
   };
 
-  const handleCreatePost = async (content: string, image?: string, category?: PostCategory, parentId?: string) => {
+  const handleCreatePost = async (content: string, mediaUrl?: string, mediaType?: string, parentId?: string) => {
     if (!content.trim() || !user) return;
     
     try {
       const postData = {
         userId: user.id,
-        userName: user.name,
-        userAvatar: user.avatar,
-        category: category || 'News',
         content: content,
-        image: image?.trim() || null,
-        likes: 0,
-        likedBy: [],
-        replyCount: 0,
-        parentId: parentId || null,
+        mediaUrl: mediaUrl?.trim() || null,
+        mediaType: mediaType || null,
         createdAt: serverTimestamp()
       };
 
       await addDoc(collection(db, 'posts'), postData);
       
-      if (parentId) {
-        await updateDoc(doc(db, 'posts', parentId), {
-          replyCount: increment(1)
-        });
-      }
     } catch (error) {
       console.error("Error adding post: ", error);
       alert("Failed to create post. Please try again.");
@@ -214,15 +276,6 @@ export default function App() {
   const handleDeletePost = async (postId: string) => {
     try {
       const postRef = doc(db, 'posts', postId);
-      const postSnap = await getDoc(postRef);
-      if (postSnap.exists()) {
-        const postData = postSnap.data() as Post;
-        if (postData.parentId) {
-          await updateDoc(doc(db, 'posts', postData.parentId), {
-            replyCount: increment(-1)
-          });
-        }
-      }
       await deleteDoc(postRef);
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -234,7 +287,6 @@ export default function App() {
     try {
       await updateDoc(doc(db, 'posts', postId), {
         content: newContent,
-        updatedAt: serverTimestamp()
       });
     } catch (error) {
       console.error("Error updating post:", error);
@@ -254,36 +306,82 @@ export default function App() {
     }
   };
 
+  const handleReportPost = async (postId: string, reason: string) => {
+    if (!user) return;
+    try {
+      await reportPost(postId, user.id, reason);
+      setNotification({ message: 'Post reported successfully.', type: 'success' });
+      setShowReportModal({ show: false, postId: null });
+      setReportReason('');
+    } catch (error) {
+      console.error("Error reporting post:", error);
+      setNotification({ message: 'Failed to report post.', type: 'error' });
+    }
+  };
+
+  const handleUserClick = async (userId: string) => {
+    if (user && userId === user.id) {
+      setSelectedUser(user);
+      setView('profile');
+    } else {
+      const userDoc = await getDoc(doc(db, 'users', userId));
+      if (userDoc.exists()) {
+        setSelectedUser(userDoc.data() as User);
+        setView('profile');
+      }
+    }
+  };
+
   const handleLikePost = async (postId: string) => {
     if (!user) return;
     try {
-      const postRef = doc(db, 'posts', postId);
-      const postSnap = await getDoc(postRef);
-      if (!postSnap.exists()) return;
+      const likeRef = doc(db, 'likes', `${user.id}_${postId}`);
+      const likeSnap = await getDoc(likeRef);
       
-      const postData = postSnap.data() as Post;
-      const likedBy = postData.likedBy || [];
-      const hasLiked = likedBy.includes(user.id);
-
-      await updateDoc(postRef, {
-        likes: increment(hasLiked ? -1 : 1),
-        likedBy: hasLiked ? arrayRemove(user.id) : arrayUnion(user.id)
-      });
+      if (likeSnap.exists()) {
+        await deleteDoc(likeRef);
+      } else {
+        await setDoc(likeRef, {
+          userId: user.id,
+          postId: postId,
+          createdAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error("Error toggling like:", error);
     }
   };
 
+  const handleFollow = async (userId: string) => {
+    if (!user) return;
+    try {
+      const followRef = doc(db, 'follows', `${user.id}_${userId}`);
+      const followSnap = await getDoc(followRef);
+      
+      if (followSnap.exists()) {
+        await deleteDoc(followRef);
+      } else {
+        await setDoc(followRef, {
+          followerId: user.id,
+          followingId: userId,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling follow:", error);
+    }
+  };
+
   if (initializing) {
     return (
-      <div className="min-h-screen bg-ocean flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-cyan-water/20 border-t-cyan-water rounded-full animate-spin" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-border border-t-accent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 bg-background text-primary">
       <Navbar user={user} onLogout={handleLogout} onNavigate={setView} />
       
       <AnimatePresence mode="wait">
@@ -295,7 +393,7 @@ export default function App() {
           <AuthPage key="auth" mode={view as 'login' | 'signup'} onAuth={handleAuth} onGoogleAuth={handleGoogleAuth} />
         )}
         
-        {(view === 'feed' || view === 'directory' || view === 'market' || view === 'profile') && (
+        {(view === 'feed' || view === 'gili-vibes' || view === 'friends' || view === 'notification' || view === 'profile') && (
           <motion.main 
             key="main"
             initial={{ opacity: 0 }}
@@ -306,67 +404,115 @@ export default function App() {
             <div className="hidden md:flex flex-col gap-2 w-20 lg:w-64">
               {[
                 { id: 'feed', icon: Home, label: 'Feed' },
-                { id: 'directory', icon: MapPin, label: 'Directory' },
-                { id: 'market', icon: ShoppingBag, label: 'Market' },
+                { id: 'gili-vibes', icon: Camera, label: 'Gili Vibes' },
+                { id: 'friends', icon: Users, label: 'Friends' },
+                { id: 'notification', icon: Bell, label: 'Notification' },
                 { id: 'profile', icon: UserIcon, label: 'Profile' }
               ].map(item => (
                 <button
                   key={item.id}
-                  onClick={() => setView(item.id)}
-                  className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${view === item.id ? 'bg-cyan-water/10 text-cyan-water' : 'hover:bg-white/5 text-secondary-text'}`}
+                  onClick={() => {
+                    if (item.id === 'profile') setSelectedUser(user);
+                    setView(item.id);
+                  }}
+                  className={`flex items-center gap-4 p-4 rounded-xl transition-all ${view === item.id ? 'bg-accent/10 text-accent' : 'hover:bg-border/50 text-secondary'}`}
                 >
                   <item.icon className="w-6 h-6" />
-                  <span className="hidden lg:block font-bold">{item.label}</span>
+                  <span className="hidden lg:block font-semibold">{item.label}</span>
                 </button>
               ))}
               
+              {user?.role === 'Admin' && (
+                <button 
+                  onClick={() => setView('admin')}
+                  className={`flex items-center gap-4 p-4 rounded-xl transition-all ${view === 'admin' ? 'bg-red-500/10 text-red-500' : 'hover:bg-border/50 text-secondary'}`}
+                >
+                  <Users className="w-6 h-6" />
+                  <span className="hidden lg:block font-semibold">Admin</span>
+                </button>
+              )}
+              
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="mt-4 flex items-center justify-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-cyan-water to-blue-600 text-white shadow-lg shadow-cyan-water/20 hover:scale-[1.02] transition-transform"
+                className="mt-4 flex items-center justify-center gap-4 p-4 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors"
               >
                 <PlusSquare className="w-6 h-6" />
-                <span className="hidden lg:block font-bold">Create Post</span>
+                <span className="hidden lg:block font-semibold">Create Post</span>
               </button>
             </div>
 
             {/* Main Content */}
             <div className="flex-1 max-w-2xl">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-display font-bold capitalize">{view}</h2>
+                <h2 className="text-3xl font-bold capitalize tracking-tight">{view === 'gili-vibes' ? 'Gili Vibes' : view}</h2>
                 <div className="md:hidden flex gap-2">
-                   <button onClick={() => setShowCreateModal(true)} className="p-2 bg-cyan-water text-ocean rounded-lg"><PlusSquare className="w-5 h-5" /></button>
+                   <button onClick={() => setShowCreateModal(true)} className="p-2 bg-primary text-white rounded-lg"><PlusSquare className="w-5 h-5" /></button>
                 </div>
               </div>
 
-              {view === 'feed' && (
-                <div className="space-y-4">
-                  {posts.filter(p => !p.parentId).length > 0 ? (
-                    posts.filter(p => !p.parentId).map(post => (
-                      <div key={post.id}>
-                        <PostCard 
-                          post={post} 
-                          currentUser={user} 
-                          onDelete={handleDeletePost} 
-                          onUpdate={handleUpdatePost}
-                          onLike={handleLikePost}
-                          onReply={handleCreatePost}
-                          allPosts={posts}
-                        />
+              {(view === 'feed' || view === 'gili-vibes') && (
+                <div className="space-y-6">
+                  {/* Post Trigger */}
+                  {user && (
+                    <div 
+                      onClick={() => setShowCreateModal(true)}
+                      className="card p-4 flex items-center gap-4 cursor-pointer hover:bg-surface/50 transition-colors group"
+                    >
+                      <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-border" referrerPolicy="no-referrer" />
+                      <div className="flex-1 bg-background border border-border rounded-full px-5 py-2.5 text-secondary text-sm group-hover:border-accent/50 transition-colors">
+                        What's happening on Gili T?
                       </div>
-                    ))
+                      <PlusSquare className="w-5 h-5 text-accent opacity-50 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  )}
+
+                  {loadingPosts ? (
+                    <div className="space-y-6">
+                      {[1, 2, 3].map(i => <PostSkeleton key={i} />)}
+                    </div>
+                  ) : posts.filter(p => !p.parentId && (view === 'feed' || p.category === 'Gili Vibes')).length > 0 ? (
+                    <motion.div 
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        visible: { transition: { staggerChildren: 0.1 } }
+                      }}
+                      className="space-y-6"
+                    >
+                      {posts.filter(p => !p.parentId && (view === 'feed' || p.category === 'Gili Vibes')).map(post => (
+                        <motion.div 
+                          key={post.id} 
+                          variants={{
+                            hidden: { opacity: 0, y: 20 },
+                            visible: { opacity: 1, y: 0 }
+                          }}
+                        >
+                          <PostCard 
+                            post={post} 
+                            currentUser={user} 
+                            onDelete={handleDeletePost} 
+                            onUpdate={handleUpdatePost}
+                            onLike={handleLikePost}
+                            onReply={handleCreatePost}
+                            onReport={(postId) => setShowReportModal({ show: true, postId })}
+                            allPosts={posts}
+                            onUserClick={handleUserClick}
+                            setNotification={setNotification}
+                          />
+                        </motion.div>
+                      ))}
+                    </motion.div>
                   ) : (
-                    <div className="text-center py-20 text-secondary-text">
+                    <div className="text-center py-20 text-secondary">
                       <p className="mb-4">No updates yet. Be the first to share!</p>
                     </div>
                   )}
                 </div>
               )}
 
-              {view === 'directory' && <DirectoryView spots={spots} />}
-              {view === 'market' && <MarketView items={marketItems} />}
-              {view === 'profile' && user && (
+              {view === 'profile' && (selectedUser || user) && (
                 <ProfileView 
-                  user={user} 
+                  user={selectedUser || user!} 
                   posts={posts} 
                   currentUser={user}
                   onDelete={handleDeletePost}
@@ -374,13 +520,24 @@ export default function App() {
                   onLike={handleLikePost}
                   onReply={handleCreatePost}
                   onUpdateProfile={handleUpdateProfile}
+                  onFollow={handleFollow}
+                  onReport={(postId) => setShowReportModal({ show: true, postId })}
+                  isFollowing={user ? (selectedUser || user!).followers?.includes(user.id) || false : false}
                   allPosts={posts}
+                  loadingPosts={loadingPosts}
+                  setNotification={setNotification}
                 />
+              )}
+              {view === 'notification' && (
+                <NotificationsView notifications={notifications} />
               )}
             </div>
 
             {/* Right Sidebar */}
-            <Sidebar />
+            <Sidebar 
+              suggestedUsers={suggestedUsers}
+              onUserClick={handleUserClick}
+            />
           </motion.main>
         )}
       </AnimatePresence>
@@ -390,37 +547,116 @@ export default function App() {
         onClose={() => setShowCreateModal(false)}
         content={newPostContent}
         onContentChange={setNewPostContent}
-        image={newPostImage}
-        onImageChange={setNewPostImage}
-        category={newPostCategory}
-        onCategoryChange={setNewPostCategory}
-        userId={user?.id || ''}
+        mediaUrl={newPostImage}
+        onMediaUrlChange={setNewPostImage}
+        user={user}
+        setNotification={setNotification}
         onSubmit={async () => {
-          await handleCreatePost(newPostContent, newPostImage, newPostCategory);
+          await handleCreatePost(newPostContent, newPostImage);
           setNewPostContent('');
           setNewPostImage('');
           setShowCreateModal(false);
+          setNotification({ message: 'Post created successfully!', type: 'success' });
         }}
       />
 
+      <AnimatePresence>
+        {showReportModal.show && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReportModal({ show: false, postId: null })}
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="card w-full max-w-sm rounded-3xl relative z-10 p-6"
+            >
+              <h3 className="text-lg font-bold text-primary mb-4">Report Post</h3>
+              <textarea
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                placeholder="Why are you reporting this post?"
+                className="w-full bg-background border border-border rounded-xl p-3 mb-4 text-sm focus:outline-none focus:border-accent min-h-[100px] resize-none"
+              />
+              <div className="flex justify-end gap-2">
+                <button 
+                  onClick={() => setShowReportModal({ show: false, postId: null })}
+                  className="px-4 py-2 text-sm font-semibold text-secondary hover:text-primary"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => showReportModal.postId && handleReportPost(showReportModal.postId, reportReason)}
+                  disabled={!reportReason.trim()}
+                  className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                >
+                  Report
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {view === 'admin' && user?.role === 'Admin' && (
+          <motion.main
+            key="admin"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="max-w-4xl mx-auto px-4 pt-24"
+          >
+            <AdminSettings />
+          </motion.main>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Nav */}
       {user && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 glass border-t border-sand-border px-6 py-3 flex items-center justify-between z-50">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border px-6 py-3 flex items-center justify-between z-50">
           {[
             { id: 'feed', icon: Home },
-            { id: 'directory', icon: MapPin },
-            { id: 'market', icon: ShoppingBag },
+            { id: 'gili-vibes', icon: Camera },
+            { id: 'friends', icon: Users },
+            { id: 'notification', icon: Bell },
             { id: 'profile', icon: UserIcon }
           ].map(item => (
             <button
               key={item.id}
-              onClick={() => setView(item.id)}
-              className={`p-2 rounded-xl transition-all ${view === item.id ? 'text-cyan-water bg-cyan-water/10' : 'text-secondary-text'}`}
+              onClick={() => {
+                if (item.id === 'profile') setSelectedUser(user);
+                setView(item.id);
+              }}
+              className={`p-2 rounded-xl transition-all ${view === item.id ? 'text-accent bg-accent/10' : 'text-secondary'}`}
             >
               <item.icon className="w-6 h-6" />
             </button>
           ))}
+          {user.role === 'Admin' && (
+            <button
+              onClick={() => setView('admin')}
+              className={`p-2 rounded-xl transition-all ${view === 'admin' ? 'text-red-500 bg-red-500/10' : 'text-secondary'}`}
+            >
+              <Shield className="w-6 h-6" />
+            </button>
+          )}
         </div>
+      )}
+
+      {/* Notification Toast */}
+      {notification && (
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          className={`fixed bottom-20 md:bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-[100] ${
+            notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+          }`}
+        >
+          {notification.message}
+        </motion.div>
       )}
     </div>
   );
