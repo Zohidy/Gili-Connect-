@@ -38,10 +38,10 @@ const Sidebar: React.FC<SidebarProps> = ({ suggestedUsers = [], onUserClick }) =
                 className="flex items-center gap-3 cursor-pointer"
                 onClick={() => onUserClick?.(user.id)}
               >
-                <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-border group-hover:border-accent transition-colors" referrerPolicy="no-referrer" />
+                <img src={user.profilePictureUrl || user.avatar} alt={user.displayName || user.name || user.username} className="w-10 h-10 rounded-full object-cover border border-border group-hover:border-accent transition-colors" referrerPolicy="no-referrer" />
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold text-primary group-hover:text-accent transition-colors">{user.name}</span>
-                  <span className="text-[10px] text-secondary font-medium">@{user.email.split('@')[0]}</span>
+                  <span className="text-sm font-bold text-primary group-hover:text-accent transition-colors">{user.displayName || user.name || user.username}</span>
+                  <span className="text-[10px] text-secondary font-medium">@{(user.email || '').split('@')[0]}</span>
                 </div>
               </div>
               <button className="p-2 text-accent hover:bg-accent/10 rounded-full transition-colors">

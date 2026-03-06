@@ -1,7 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, FirebaseApp } from "firebase/app";
+import { getAnalytics, Analytics } from "firebase/analytics";
+import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
+import { getFirestore, Firestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA1Q1eRGetcuQTfXksATRHBWznpO_n_-uI",
@@ -14,12 +14,23 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app: FirebaseApp;
+let analytics: Analytics | null = null;
+let auth: Auth;
+let db: Firestore;
+let googleProvider: GoogleAuthProvider;
 
-// Initialize services
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-export const db = getFirestore(app);
+try {
+  app = initializeApp(firebaseConfig);
+  analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
+  auth = getAuth(app);
+  db = getFirestore(app);
+  googleProvider = new GoogleAuthProvider();
+  console.log("Firebase initialized successfully");
+} catch (error) {
+  console.error("Firebase initialization failed:", error);
+  // Do not throw, let the app try to start so ErrorBoundary can catch usage errors
+}
 
+export { app, analytics, auth, db, googleProvider };
 export default app;

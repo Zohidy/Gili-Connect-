@@ -501,7 +501,6 @@ export default function App() {
                 { id: 'feed', icon: Home, label: 'Feed' },
                 { id: 'gili-vibes', icon: Camera, label: 'Gili Vibes' },
                 { id: 'friends', icon: Users, label: 'Friends' },
-                { id: 'notification', icon: Bell, label: 'Notification' },
                 { id: 'profile', icon: UserIcon, label: 'Profile' }
               ].map(item => (
                 <button
@@ -634,9 +633,6 @@ export default function App() {
                       )}
                     </div>
                   )}
-                  <div className="md:hidden flex gap-2">
-                     <button onClick={() => setShowCreateModal(true)} className="p-2 bg-primary text-white rounded-lg"><PlusSquare className="w-5 h-5" /></button>
-                  </div>
                 </div>
               </div>
 
@@ -648,7 +644,7 @@ export default function App() {
                       onClick={() => setShowCreateModal(true)}
                       className="card p-4 flex items-center gap-4 cursor-pointer hover:bg-surface/50 transition-colors group"
                     >
-                      <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-border" referrerPolicy="no-referrer" />
+                      <img src={user.profilePictureUrl || user.avatar} alt={user.displayName || user.name || user.username} className="w-10 h-10 rounded-full border border-border" referrerPolicy="no-referrer" />
                       <div className="flex-1 bg-background border border-border rounded-full px-5 py-2.5 text-secondary text-sm group-hover:border-accent/50 transition-colors">
                         What's happening on Gili T?
                       </div>
@@ -666,9 +662,10 @@ export default function App() {
                     if (selectedCategory !== 'All') return p.category === selectedCategory;
                     if (searchQuery) {
                       const query = searchQuery.toLowerCase();
-                      return p.content.toLowerCase().includes(query) || 
-                             p.category.toLowerCase().includes(query) ||
-                             p.userName.toLowerCase().includes(query);
+                      const contentMatch = p.content?.toLowerCase().includes(query) || false;
+                      const categoryMatch = p.category?.toLowerCase().includes(query) || false;
+                      const userMatch = p.userName?.toLowerCase().includes(query) || false;
+                      return contentMatch || categoryMatch || userMatch;
                     }
                     return true;
                   }).length > 0 ? (
@@ -686,9 +683,10 @@ export default function App() {
                         if (selectedCategory !== 'All') return p.category === selectedCategory;
                         if (searchQuery) {
                           const query = searchQuery.toLowerCase();
-                          return p.content.toLowerCase().includes(query) || 
-                                 p.category.toLowerCase().includes(query) ||
-                                 p.userName.toLowerCase().includes(query);
+                          const contentMatch = p.content?.toLowerCase().includes(query) || false;
+                          const categoryMatch = p.category?.toLowerCase().includes(query) || false;
+                          const userMatch = p.userName?.toLowerCase().includes(query) || false;
+                          return contentMatch || categoryMatch || userMatch;
                         }
                         return true;
                       }).map(post => (
@@ -839,7 +837,6 @@ export default function App() {
             { id: 'gili-vibes', icon: Camera },
             { id: 'events', icon: Calendar },
             { id: 'friends', icon: Users },
-            { id: 'notification', icon: Bell },
             { id: 'profile', icon: UserIcon }
           ].map(item => (
             <button

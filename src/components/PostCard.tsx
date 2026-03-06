@@ -37,7 +37,7 @@ const PostCard: React.FC<PostCardProps> = ({
   setNotification
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(post.content);
+  const [editContent, setEditContent] = useState(post.content || '');
   const [isLiking, setIsLiking] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [replyContent, setReplyContent] = useState('');
@@ -56,9 +56,11 @@ const PostCard: React.FC<PostCardProps> = ({
 
   const replies = allPosts.filter(p => p.parentId === post.id);
   const TEXT_LIMIT = 300;
-  const isLongText = post.content.length > TEXT_LIMIT;
+  const content = post.content || '';
+  const isLongText = content.length > TEXT_LIMIT;
 
   const formatContent = (text: string) => {
+    if (!text) return null;
     const parts = text.split(/((?:#|@)\w+)/g);
     return parts.map((part, i) => {
       if (part.startsWith('#')) {
@@ -96,11 +98,26 @@ const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
-  const handleLike = async () => {
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUser) {
+      if (setNotification) {
+        setNotification({ message: 'Please login to like posts', type: 'error' });
+      } else {
+        alert('Please login to like posts');
+      }
+      return;
+    }
+    
     if (onLike && !isLiking) {
       setIsLiking(true);
-      await onLike(post.id);
-      setIsLiking(false);
+      try {
+        await onLike(post.id);
+      } catch (error) {
+        console.error("Like failed:", error);
+      } finally {
+        setIsLiking(false);
+      }
     }
   };
 
@@ -256,7 +273,7 @@ const PostCard: React.FC<PostCardProps> = ({
               <button 
                 onClick={() => {
                   setIsEditing(false);
-                  setEditContent(post.content);
+                  setEditContent(content);
                 }}
                 className="flex items-center gap-2 px-4 py-2 text-secondary hover:text-primary transition-colors text-xs font-bold uppercase tracking-wider"
               >
@@ -274,8 +291,8 @@ const PostCard: React.FC<PostCardProps> = ({
           <div className="mb-4">
             <p className="text-[15px] leading-relaxed text-primary/90 whitespace-pre-wrap">
               {isLongText && !isExpanded 
-                ? formatContent(post.content.slice(0, TEXT_LIMIT)) 
-                : formatContent(post.content)}
+                ? formatContent(content.slice(0, TEXT_LIMIT)) 
+                : formatContent(content)}
               {isLongText && !isExpanded && '...'}
             </p>
             {isLongText && (

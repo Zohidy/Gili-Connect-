@@ -85,12 +85,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   useEffect(() => {
     const q = query(
       collection(db, 'posts'),
-      where('userId', '==', user.id),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.id)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      // Sort client-side to avoid needing a composite index
+      posts.sort((a, b) => {
+        const timeA = a.createdAt instanceof Object && 'seconds' in a.createdAt ? a.createdAt.seconds : 0;
+        const timeB = b.createdAt instanceof Object && 'seconds' in b.createdAt ? b.createdAt.seconds : 0;
+        return timeB - timeA;
+      });
       setUserPosts(posts);
       setLoadingPosts(false);
     });
@@ -161,8 +166,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="relative inline-block group">
               <div className="absolute -inset-1 bg-gradient-to-tr from-accent to-primary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
               <img 
-                src={user.avatar} 
-                alt={user.name} 
+                src={user.profilePictureUrl || user.avatar} 
+                alt={user.displayName || user.name || user.username} 
                 className="w-32 h-32 rounded-full border-4 border-surface mx-auto relative z-10 object-cover shadow-2xl" 
                 referrerPolicy="no-referrer" 
               />
@@ -195,10 +200,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({
           {/* User Info */}
           <div className="text-left mb-8">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-3xl font-black text-primary tracking-tight">{user.name}</h3>
+              <h3 className="text-3xl font-black text-primary tracking-tight">{user.displayName || user.name || user.username}</h3>
               <RoleBadge role={user.role} />
             </div>
-            <p className="text-secondary font-medium mb-4">@{user.email.split('@')[0]}</p>
+            <p className="text-secondary font-medium mb-4">@{(user.email || '').split('@')[0]}</p>
             
             {user.bio && (
               <p className="text-[15px] leading-relaxed text-primary/80 max-w-2xl mb-6">

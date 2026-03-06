@@ -55,13 +55,13 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate }) => (
             onClick={() => onNavigate('profile')}
           >
             <img 
-              src={user.avatar} 
-              alt={user.name} 
+              src={user.profilePictureUrl || user.avatar} 
+              alt={user.displayName || user.name || user.username} 
               className="w-9 h-9 rounded-full border border-border group-hover:border-accent transition-colors object-cover" 
               referrerPolicy="no-referrer" 
             />
             <span className="hidden sm:block text-sm font-bold text-primary group-hover:text-accent transition-colors">
-              {user.name.split(' ')[0]}
+              {(user.displayName || user.name || user.username || '').split(' ')[0]}
             </span>
           </div>
           <div className="w-px h-4 bg-border mx-1" />
