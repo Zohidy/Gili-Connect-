@@ -46,9 +46,12 @@ import {
   where
 } from 'firebase/firestore';
 import { User, Post, Notification, IslandRole, PostCategory } from './types';
+import { getUserById } from './services/userService';
 
 // Components
-import Navbar from './components/Navbar';
+import MenuView from './components/MenuView';
+import TopBar from './components/Navbar';
+import BottomNav from './components/BottomNav';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import PostCard from './components/PostCard';
@@ -59,10 +62,12 @@ import PostSkeleton from './components/PostSkeleton';
 import AdminSettings from './components/AdminSettings';
 import NotificationsView from './components/NotificationsView';
 import EventsView from './components/EventsView';
+import TouristWidgets from './components/dashboard/TouristWidgets';
 import { reportPost } from './services/reportService';
 
 export default function App() {
   const [view, setView] = useState('landing');
+  const [showMenu, setShowMenu] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -122,12 +127,9 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        let currentUserData: User;
+        let currentUserData = await getUserById(firebaseUser.uid);
         
-        if (userDoc.exists()) {
-          currentUserData = userDoc.data() as User;
-        } else {
+        if (!currentUserData) {
           currentUserData = {
             id: firebaseUser.uid,
             username: firebaseUser.displayName || 'Island Explorer',
@@ -208,10 +210,8 @@ export default function App() {
 
         if (!userAvatar || !userName) {
              try {
-                 const userDocRef = doc(db, 'users', data.userId);
-                 const userDocSnap = await getDoc(userDocRef);
-                 if (userDocSnap.exists()) {
-                     const userData = userDocSnap.data() as User;
+                 const userData = await getUserById(data.userId);
+                 if (userData) {
                      userAvatar = userData.profilePictureUrl || userData.avatar;
                      userName = userData.displayName || userData.username || userData.name;
                      userRole = userData.role;
@@ -410,9 +410,9 @@ export default function App() {
       setSelectedUser(user);
       setView('profile');
     } else {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        setSelectedUser(userDoc.data() as User);
+      const fetchedUser = await getUserById(userId);
+      if (fetchedUser) {
+        setSelectedUser(fetchedUser);
         setView('profile');
       }
     }
@@ -477,7 +477,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-20 bg-background text-primary">
-      <Navbar user={user} onLogout={handleLogout} onNavigate={setView} />
+      {user && view !== 'landing' && view !== 'login' && view !== 'signup' && (
+        <TopBar onToggleMenu={() => setShowMenu(true)} onNavigate={setView} onCreatePost={() => setShowCreateModal(true)} />
+      )}
+      
+      {showMenu && <MenuView user={user} onClose={() => setShowMenu(false)} onLogout={handleLogout} />}
       
       <AnimatePresence mode="wait">
         {view === 'landing' && (
@@ -638,6 +642,7 @@ export default function App() {
 
               {(view === 'feed' || view === 'gili-vibes') && (
                 <div className="space-y-6">
+                  {view === 'feed' && <TouristWidgets />}
                   {/* Post Trigger */}
                   {user && (
                     <div 
@@ -873,6 +878,9 @@ export default function App() {
         >
           {notification.message}
         </motion.div>
+      )}
+      {user && view !== 'landing' && view !== 'login' && view !== 'signup' && (
+        <BottomNav activeTab={view} onNavigate={setView} notifications={notifications} />
       )}
     </div>
   );

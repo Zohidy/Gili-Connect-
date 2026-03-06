@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import './firebase';
+import { UserCacheProvider } from './contexts/UserCacheContext';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 
 console.log("Main.tsx is running...");
@@ -13,7 +14,9 @@ try {
   createRoot(rootElement).render(
     <StrictMode>
       <ErrorBoundary>
-        <App />
+        <UserCacheProvider>
+          <App />
+        </UserCacheProvider>
       </ErrorBoundary>
     </StrictMode>,
   );

@@ -18,12 +18,13 @@
 }
 
 :root {
-  --background: #f5f5f5;
+  /* Warm, island-inspired palette */
+  --background: #fdfcf8; /* Soft sand */
   --surface: #ffffff;
-  --primary: #171717;
-  --secondary: #737373;
-  --border: #e5e5e5;
-  --accent: #171717;
+  --primary: #1a2e35; /* Deep ocean */
+  --secondary: #5a6e75; /* Muted sea */
+  --border: #e2e8f0;
+  --accent: #d97706; /* Warm sunset/sand accent */
 
   --success-bg: #dcfce7;
   --success-text: #166534;
@@ -32,12 +33,12 @@
 }
 
 .dark {
-  --background: #0a0a0a;
-  --surface: #171717;
-  --primary: #fafafa;
-  --secondary: #a3a3a3;
-  --border: #262626;
-  --accent: #fafafa;
+  --background: #0f172a; /* Dark night sea */
+  --surface: #1e293b;
+  --primary: #f8fafc;
+  --secondary: #94a3b8;
+  --border: #334155;
+  --accent: #fbbf24; /* Bright sunset accent */
 
   --success-bg: #064e3b;
   --success-text: #34d399;

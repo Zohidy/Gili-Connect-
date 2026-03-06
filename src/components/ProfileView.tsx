@@ -149,26 +149,25 @@ const ProfileView: React.FC<ProfileViewProps> = ({
     <div className="space-y-6 pb-20">
       <div className="card overflow-hidden relative shadow-xl border-none bg-surface/50 backdrop-blur-sm">
         {/* Cover Image */}
-        <div className="h-48 w-full bg-gradient-to-r from-accent/20 to-primary/20 relative group">
+        <div className="h-48 w-full bg-gradient-to-r from-accent/20 to-emerald-500/20 relative group">
           {user.coverImage ? (
             <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center opacity-30">
+            <div className="w-full h-full flex items-center justify-center opacity-30 bg-[#fdfcf8]">
               <Anchor className="w-12 h-12 text-accent" />
             </div>
           )}
-          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 bg-black/10" />
         </div>
         
         <div className="px-6 md:px-10 pb-8 relative">
           {/* Avatar & Actions */}
           <div className="flex flex-col md:flex-row items-end justify-between -mt-16 mb-6 gap-4">
-            <div className="relative inline-block group">
-              <div className="absolute -inset-1 bg-gradient-to-tr from-accent to-primary rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
+            <div className="relative inline-block">
               <img 
                 src={user.profilePictureUrl || user.avatar} 
                 alt={user.displayName || user.name || user.username} 
-                className="w-32 h-32 rounded-full border-4 border-surface mx-auto relative z-10 object-cover shadow-2xl" 
+                className="w-32 h-32 rounded-full border-4 border-white mx-auto relative z-10 object-cover shadow-xl" 
                 referrerPolicy="no-referrer" 
               />
             </div>
@@ -177,7 +176,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
               {isOwnProfile ? (
                 <button 
                   onClick={() => setShowEditModal(true)}
-                  className="flex items-center gap-2 px-6 py-2.5 btn-secondary rounded-2xl font-bold text-sm shadow-lg hover:shadow-accent/10 transition-all"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-[#1a2e35]/5 text-[#1a2e35] rounded-2xl font-bold text-sm hover:bg-[#1a2e35]/10 transition-all"
                 >
                   <Edit2 className="w-4 h-4" />
                   Edit Profile
@@ -187,8 +186,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                   onClick={handleFollowClick}
                   className={`px-8 py-2.5 rounded-2xl text-sm font-bold shadow-lg transition-all ${
                     isFollowingLocal 
-                      ? 'btn-secondary' 
-                      : 'btn-primary hover:shadow-accent/20 scale-105 active:scale-95'
+                      ? 'bg-[#1a2e35]/5 text-[#1a2e35]' 
+                      : 'bg-accent text-white hover:bg-accent/90 shadow-accent/20'
                   }`}
                 >
                   {isFollowingLocal ? 'Unfollow' : 'Follow'}
@@ -200,20 +199,20 @@ const ProfileView: React.FC<ProfileViewProps> = ({
           {/* User Info */}
           <div className="text-left mb-8">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-3xl font-black text-primary tracking-tight">{user.displayName || user.name || user.username}</h3>
+              <h3 className="text-3xl font-black text-[#1a2e35] tracking-tighter">{user.displayName || user.name || user.username}</h3>
               <RoleBadge role={user.role} />
             </div>
-            <p className="text-secondary font-medium mb-4">@{(user.email || '').split('@')[0]}</p>
+            <p className="text-[#1a2e35]/60 font-bold mb-4">@{(user.email || '').split('@')[0]}</p>
             
             {user.bio && (
-              <p className="text-[15px] leading-relaxed text-primary/80 max-w-2xl mb-6">
+              <p className="text-[15px] leading-relaxed text-[#1a2e35]/80 max-w-2xl mb-6">
                 {user.bio}
               </p>
             )}
 
             <div className="flex flex-wrap gap-6 mb-8">
               {user.location && (
-                <div className="flex items-center gap-2 text-sm text-secondary font-medium">
+                <div className="flex items-center gap-2 text-sm text-[#1a2e35]/60 font-bold">
                   <MapPin className="w-4 h-4 text-accent" />
                   {user.location}
                 </div>
@@ -224,18 +223,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                   {user.giliConnection}
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-secondary font-medium">
+              <div className="flex items-center gap-2 text-sm text-[#1a2e35]/60 font-bold">
                 <Calendar className="w-4 h-4" />
                 Joined {user.joinedAt || '2024'}
               </div>
             </div>
 
             {/* Stats */}
-            <div className="flex gap-8 py-6 border-y border-border/50">
+            <div className="flex gap-8 py-6 border-y border-[#1a2e35]/10">
               {stats.map(stat => (
                 <div key={stat.label} className="flex flex-col">
-                  <span className="text-xl font-black text-primary tracking-tight">{stat.value}</span>
-                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">{stat.label}</span>
+                  <span className="text-xl font-black text-[#1a2e35] tracking-tight">{stat.value}</span>
+                  <span className="text-xs font-bold text-[#1a2e35]/50 uppercase tracking-widest">{stat.label}</span>
                 </div>
               ))}
             </div>
@@ -255,7 +254,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-8 border-b border-border mb-6 px-4 overflow-x-auto">
+      <div className="flex items-center gap-8 border-b border-[#1a2e35]/10 mb-6 px-4 overflow-x-auto">
         {[
           { id: 'posts', label: 'Posts' },
           { id: 'media', label: 'Media' },
@@ -266,7 +265,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
-              activeTab === tab.id ? 'text-accent' : 'text-secondary hover:text-primary'
+              activeTab === tab.id ? 'text-accent' : 'text-[#1a2e35]/50 hover:text-[#1a2e35]'
             }`}
           >
             {tab.label}

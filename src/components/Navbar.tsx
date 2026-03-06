@@ -1,82 +1,33 @@
 import React from 'react';
-import { Ship, LogOut, Bell } from 'lucide-react';
-import { User } from '../types';
+import { Plus, Search, Menu, Ship } from 'lucide-react';
 
-interface NavbarProps {
-  user: User | null;
-  onLogout: () => void;
+interface TopBarProps {
+  onToggleMenu: () => void;
   onNavigate: (view: string) => void;
+  onCreatePost: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate }) => (
-  <nav className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
-    <div className="flex items-center gap-6">
-      <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onNavigate('feed')}>
-        <div className="w-8 h-8 flex items-center justify-center">
-          <Ship className="text-primary w-6 h-6 group-hover:scale-110 transition-transform" />
-        </div>
-        <span className="text-lg font-bold tracking-tight text-primary">Gili</span>
+const TopBar: React.FC<TopBarProps> = ({ onToggleMenu, onNavigate, onCreatePost }) => (
+  <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-border px-4 py-3 flex items-center justify-between">
+    <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onNavigate('feed')}>
+      <div className="w-8 h-8 flex items-center justify-center">
+        <Ship className="text-blue-600 w-6 h-6 group-hover:scale-110 transition-transform" />
       </div>
-      
-      {user && (
-        <div className="hidden md:flex items-center gap-1">
-          <button 
-            onClick={() => onNavigate('feed')}
-            className="px-4 py-2 text-sm font-bold text-secondary hover:text-accent transition-colors uppercase tracking-wider"
-          >
-            Feed
-          </button>
-          <button 
-            onClick={() => onNavigate('profile')}
-            className="px-4 py-2 text-sm font-bold text-secondary hover:text-accent transition-colors uppercase tracking-wider"
-          >
-            Profile
-          </button>
-          {user.role === 'Admin' && (
-            <button 
-              onClick={() => onNavigate('admin')}
-              className="px-4 py-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-wider"
-            >
-              Admin
-            </button>
-          )}
-        </div>
-      )}
+      <span className="text-xl font-black text-blue-600 tracking-tighter">Gili Connect</span>
     </div>
-
-    <div className="flex items-center gap-4">
-      {user ? (
-        <div className="flex items-center gap-3">
-          <button onClick={() => onNavigate('notification')} className="p-2 text-secondary hover:text-accent transition-colors">
-            <Bell className="w-5 h-5" />
-          </button>
-          <div 
-            className="flex items-center gap-2 cursor-pointer group"
-            onClick={() => onNavigate('profile')}
-          >
-            <img 
-              src={user.profilePictureUrl || user.avatar} 
-              alt={user.displayName || user.name || user.username} 
-              className="w-9 h-9 rounded-full border border-border group-hover:border-accent transition-colors object-cover" 
-              referrerPolicy="no-referrer" 
-            />
-            <span className="hidden sm:block text-sm font-bold text-primary group-hover:text-accent transition-colors">
-              {(user.displayName || user.name || user.username || '').split(' ')[0]}
-            </span>
-          </div>
-          <div className="w-px h-4 bg-border mx-1" />
-          <button onClick={onLogout} className="p-2 hover:bg-red-500/10 rounded-full transition-colors text-secondary hover:text-red-500" title="Logout">
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <button onClick={() => onNavigate('login')} className="text-sm font-medium px-3 py-1.5 text-secondary hover:text-primary transition-colors">Login</button>
-          <button onClick={() => onNavigate('signup')} className="text-sm font-medium btn-primary px-3 py-1.5 rounded-full">Sign Up</button>
-        </div>
-      )}
+    
+    <div className="flex items-center gap-2">
+      <button onClick={onCreatePost} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+        <Plus className="w-6 h-6" />
+      </button>
+      <button className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+        <Search className="w-6 h-6" />
+      </button>
+      <button onClick={onToggleMenu} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
+        <Menu className="w-6 h-6" />
+      </button>
     </div>
   </nav>
 );
 
-export default Navbar;
+export default TopBar;
