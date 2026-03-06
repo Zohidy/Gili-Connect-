@@ -18,6 +18,7 @@ interface PostCardProps {
   allPosts?: Post[];
   isReply?: boolean;
   onUserClick?: (userId: string) => void;
+  onHashtagClick?: (tag: string) => void;
   setNotification?: (notification: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
@@ -32,6 +33,7 @@ const PostCard: React.FC<PostCardProps> = ({
   allPosts = [],
   isReply = false,
   onUserClick,
+  onHashtagClick,
   setNotification
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -57,13 +59,31 @@ const PostCard: React.FC<PostCardProps> = ({
   const isLongText = post.content.length > TEXT_LIMIT;
 
   const formatContent = (text: string) => {
-    const parts = text.split(/(\s+)/);
+    const parts = text.split(/((?:#|@)\w+)/g);
     return parts.map((part, i) => {
       if (part.startsWith('#')) {
-        return <span key={i} className="text-accent font-bold hover:underline cursor-pointer">{part}</span>;
+        return (
+          <span 
+            key={i} 
+            className="text-accent font-bold hover:underline cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onHashtagClick?.(part);
+            }}
+          >
+            {part}
+          </span>
+        );
       }
       if (part.startsWith('@')) {
-        return <span key={i} className="text-accent font-bold hover:underline cursor-pointer">{part}</span>;
+        return (
+          <span 
+            key={i} 
+            className="text-accent font-bold hover:underline cursor-pointer"
+          >
+            {part}
+          </span>
+        );
       }
       return part;
     });
@@ -414,6 +434,7 @@ const PostCard: React.FC<PostCardProps> = ({
                       allPosts={allPosts}
                       isReply={true}
                       onUserClick={onUserClick}
+                      onHashtagClick={onHashtagClick}
                     />
                   ))
                 ) : (

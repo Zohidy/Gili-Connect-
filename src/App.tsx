@@ -12,7 +12,9 @@ import {
   Bell,
   Shield,
   Camera,
-  Calendar
+  Calendar,
+  Filter,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, googleProvider } from './firebase';
@@ -78,6 +80,10 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(() => 
     window.matchMedia('(prefers-color-scheme: dark)').matches
   );
+  const [sortBy, setSortBy] = useState<'latest' | 'likes'>('latest');
+  const [selectedCategory, setSelectedCategory] = useState<PostCategory | 'All'>('All');
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -106,6 +112,9 @@ export default function App() {
   useEffect(() => {
     if (view !== 'profile') {
       setSelectedUser(null);
+    }
+    if (view !== 'feed') {
+      setSelectedCategory('All');
     }
   }, [view]);
 
@@ -175,7 +184,10 @@ export default function App() {
 
   // Posts Listener
   useEffect(() => {
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+    const q = sortBy === 'likes' 
+      ? query(collection(db, 'posts'), orderBy('likes', 'desc'))
+      : query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
+
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const fetchedPosts = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
         const data = docSnapshot.data();
@@ -233,7 +245,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [sortBy]);
 
   // Fetch Suggested Users
   useEffect(() => {
@@ -255,9 +267,23 @@ export default function App() {
     }
   }, [user]);
 
+  const handleHashtagClick = (tag: string) => {
+    setSearchQuery(tag);
+    setView('feed');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleAuth = async (email: string, pass: string, name?: string, role?: IslandRole) => {
     try {
       if (name) {
+        // Check if username already exists
+        const usernameQuery = query(collection(db, 'users'), where('username', '==', name));
+        const usernameSnapshot = await getDocs(usernameQuery);
+        
+        if (!usernameSnapshot.empty) {
+          throw new Error('Username is already taken. Please choose another one.');
+        }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const newUser: User = {
           id: userCredential.user.uid,
@@ -277,12 +303,18 @@ export default function App() {
     } catch (error: any) {
       console.error("Auth error:", error);
       let message = 'Authentication failed. Please try again.';
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.message === 'Username is already taken. Please choose another one.') {
+        message = error.message;
+      } else if (error.code === 'auth/email-already-in-use') {
         message = 'This email is already in use.';
       } else if (error.code === 'auth/invalid-credential') {
         message = 'Invalid email or password.';
       }
       setNotification({ message, type: 'error' });
+      // Don't re-throw if we handled it with a notification, or handle it in the UI component
+      // But the original code threw an error, likely for the AuthPage to catch if it does anything.
+      // Looking at AuthPage usage, it might not be catching it, but let's see.
+      // The original code had `throw new Error(message);` at the end of catch block.
       throw new Error(message);
     }
   };
@@ -298,7 +330,7 @@ export default function App() {
     setView('landing');
   };
 
-  const handleCreatePost = async (content: string, mediaUrl?: string, category?: PostCategory, parentId?: string) => {
+  const handleCreatePost = async (content: string, mediaUrl?: string, category?: PostCategory, parentId?: string, location?: string) => {
     if (!content.trim() || !user) return;
     
     try {
@@ -313,6 +345,7 @@ export default function App() {
         userName: user.displayName || user.username || user.name,
         userRole: user.role,
         parentId: parentId || null,
+        location: location || null,
         likes: 0,
         likedBy: [],
         replyCount: 0
@@ -389,15 +422,24 @@ export default function App() {
     if (!user) return;
     try {
       const likeRef = doc(db, 'likes', `${user.id}_${postId}`);
+      const postRef = doc(db, 'posts', postId);
       const likeSnap = await getDoc(likeRef);
       
       if (likeSnap.exists()) {
         await deleteDoc(likeRef);
+        await updateDoc(postRef, {
+          likes: increment(-1),
+          likedBy: arrayRemove(user.id)
+        });
       } else {
         await setDoc(likeRef, {
           userId: user.id,
           postId: postId,
           createdAt: serverTimestamp()
+        });
+        await updateDoc(postRef, {
+          likes: increment(1),
+          likedBy: arrayUnion(user.id)
         });
       }
     } catch (error) {
@@ -497,9 +539,104 @@ export default function App() {
             {/* Main Content */}
             <div className="flex-1 max-w-2xl">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold capitalize tracking-tight">{view === 'gili-vibes' ? 'Gili Vibes' : view}</h2>
-                <div className="md:hidden flex gap-2">
-                   <button onClick={() => setShowCreateModal(true)} className="p-2 bg-primary text-white rounded-lg"><PlusSquare className="w-5 h-5" /></button>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-3xl font-bold capitalize tracking-tight">{view === 'gili-vibes' ? 'Gili Vibes' : view}</h2>
+                  {searchQuery && (
+                    <div className="flex items-center gap-2 text-sm text-secondary">
+                      <span>Searching for: <span className="text-accent font-bold">{searchQuery}</span></span>
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="text-xs bg-surface border border-border px-2 py-0.5 rounded-full hover:bg-border/50"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {(view === 'feed' || view === 'gili-vibes') && (
+                    <div className="flex items-center gap-2">
+                      <div className="relative hidden sm:block">
+                        <input
+                          type="text"
+                          placeholder="Search..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 pr-4 py-2 rounded-lg bg-surface border border-border text-sm w-40 focus:w-60 transition-all focus:border-accent outline-none"
+                        />
+                        <Search className="w-4 h-4 text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
+                      </div>
+                      <div className="flex bg-surface rounded-lg p-1 border border-border">
+                        <button 
+                          onClick={() => setSortBy('latest')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${sortBy === 'latest' ? 'bg-background shadow-sm text-primary' : 'text-secondary hover:text-primary'}`}
+                        >
+                          Latest
+                        </button>
+                        <button 
+                          onClick={() => setSortBy('likes')}
+                          className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${sortBy === 'likes' ? 'bg-background shadow-sm text-primary' : 'text-secondary hover:text-primary'}`}
+                        >
+                          Top
+                        </button>
+                      </div>
+
+                      {view === 'feed' && (
+                        <div className="relative">
+                          <button 
+                            onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+                            className={`p-2 rounded-lg border transition-all ${
+                              selectedCategory !== 'All' || showCategoryFilter
+                                ? 'bg-accent text-white border-accent' 
+                                : 'bg-surface border-border text-secondary hover:border-accent/50'
+                            }`}
+                            title="Filter by category"
+                          >
+                            <Filter className="w-5 h-5" />
+                          </button>
+
+                          <AnimatePresence>
+                            {showCategoryFilter && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40" 
+                                  onClick={() => setShowCategoryFilter(false)} 
+                                />
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                  className="absolute right-0 top-full mt-2 w-48 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden"
+                                >
+                                  <div className="p-2 space-y-1">
+                                    {['All', 'News', 'Party', 'Fastboat', 'Safety', 'Food', 'Marketplace', 'Gili Vibes', 'Lost and Found'].map((cat) => (
+                                      <button
+                                        key={cat}
+                                        onClick={() => {
+                                          setSelectedCategory(cat as PostCategory | 'All');
+                                          setShowCategoryFilter(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                          selectedCategory === cat 
+                                            ? 'bg-accent/10 text-accent' 
+                                            : 'text-secondary hover:bg-background hover:text-primary'
+                                        }`}
+                                      >
+                                        {cat}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              </>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="md:hidden flex gap-2">
+                     <button onClick={() => setShowCreateModal(true)} className="p-2 bg-primary text-white rounded-lg"><PlusSquare className="w-5 h-5" /></button>
+                  </div>
                 </div>
               </div>
 
@@ -523,7 +660,18 @@ export default function App() {
                     <div className="space-y-6">
                       {[1, 2, 3].map(i => <PostSkeleton key={i} />)}
                     </div>
-                  ) : posts.filter(p => !p.parentId && (view === 'feed' || p.category === 'Gili Vibes')).length > 0 ? (
+                  ) : posts.filter(p => {
+                    if (p.parentId) return false;
+                    if (view === 'gili-vibes') return p.category === 'Gili Vibes';
+                    if (selectedCategory !== 'All') return p.category === selectedCategory;
+                    if (searchQuery) {
+                      const query = searchQuery.toLowerCase();
+                      return p.content.toLowerCase().includes(query) || 
+                             p.category.toLowerCase().includes(query) ||
+                             p.userName.toLowerCase().includes(query);
+                    }
+                    return true;
+                  }).length > 0 ? (
                     <motion.div 
                       initial="hidden"
                       animate="visible"
@@ -532,7 +680,18 @@ export default function App() {
                       }}
                       className="space-y-6"
                     >
-                      {posts.filter(p => !p.parentId && (view === 'feed' || p.category === 'Gili Vibes')).map(post => (
+                      {posts.filter(p => {
+                        if (p.parentId) return false;
+                        if (view === 'gili-vibes') return p.category === 'Gili Vibes';
+                        if (selectedCategory !== 'All') return p.category === selectedCategory;
+                        if (searchQuery) {
+                          const query = searchQuery.toLowerCase();
+                          return p.content.toLowerCase().includes(query) || 
+                                 p.category.toLowerCase().includes(query) ||
+                                 p.userName.toLowerCase().includes(query);
+                        }
+                        return true;
+                      }).map(post => (
                         <motion.div 
                           key={post.id} 
                           variants={{
@@ -551,6 +710,7 @@ export default function App() {
                             allPosts={posts}
                             onUserClick={handleUserClick}
                             setNotification={setNotification}
+                            onHashtagClick={handleHashtagClick}
                           />
                         </motion.div>
                       ))}
@@ -577,6 +737,7 @@ export default function App() {
                   isFollowing={user ? (selectedUser || user!).followers?.includes(user.id) || false : false}
                   allPosts={posts}
                   setNotification={setNotification}
+                  onHashtagClick={handleHashtagClick}
                 />
               )}
               {view === 'notification' && (
@@ -607,8 +768,8 @@ export default function App() {
         onCategoryChange={setNewPostCategory}
         user={user}
         setNotification={setNotification}
-        onSubmit={async () => {
-          await handleCreatePost(newPostContent, newPostImage, newPostCategory);
+        onSubmit={async (location) => {
+          await handleCreatePost(newPostContent, newPostImage, newPostCategory, undefined, location);
           setNewPostContent('');
           setNewPostImage('');
           setNewPostCategory('Gili Vibes');

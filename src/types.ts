@@ -1,7 +1,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 export type IslandRole = 'Tourist' | 'Local' | 'Business' | 'Admin' | 'Moderator' | 'Supporter';
-export type PostCategory = 'Party' | 'Fastboat' | 'Safety' | 'Food' | 'News' | 'Marketplace' | 'Gili Vibes';
+export type PostCategory = 'Party' | 'Fastboat' | 'Safety' | 'Food' | 'News' | 'Marketplace' | 'Gili Vibes' | 'Lost and Found';
 
 export interface User {
   id: string;

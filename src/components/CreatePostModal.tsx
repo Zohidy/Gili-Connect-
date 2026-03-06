@@ -26,6 +26,7 @@ const CATEGORIES: { id: PostCategory; label: string; icon: string }[] = [
   { id: 'Safety', label: 'Safety', icon: '🛡️' },
   { id: 'Food', label: 'Food', icon: '🍱' },
   { id: 'Marketplace', label: 'Market', icon: '🛒' },
+  { id: 'Lost and Found', label: 'Lost & Found', icon: '🔍' },
 ];
 
 const CreatePostModal: React.FC<CreatePostModalProps> = ({
@@ -47,6 +48,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState('');
+  const [showFullPreview, setShowFullPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const MAX_CHARS = 280;
 
@@ -164,15 +166,58 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
               {/* Image Preview */}
               {image && (
                 <div className="relative rounded-2xl overflow-hidden border border-border group mb-4 max-h-72">
-                  <img src={image} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img 
+                    src={image} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover cursor-zoom-in hover:scale-[1.02] transition-transform duration-500" 
+                    referrerPolicy="no-referrer" 
+                    onClick={() => setShowFullPreview(true)}
+                  />
                   <button 
-                    onClick={() => onImageChange('')}
-                    className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onImageChange('');
+                    }}
+                    className="absolute top-3 right-3 p-2 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors z-10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               )}
+
+              {/* Full Screen Preview Overlay */}
+              <AnimatePresence>
+                {showFullPreview && image && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-10 cursor-zoom-out"
+                    onClick={() => setShowFullPreview(false)}
+                  >
+                    <motion.button
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors z-[120]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowFullPreview(false);
+                      }}
+                    >
+                      <X className="w-6 h-6" />
+                    </motion.button>
+                    <motion.img 
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      src={image} 
+                      alt="Full Preview" 
+                      className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                      referrerPolicy="no-referrer"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Upload Loading */}
               {isUploading && (

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { User, Post, PostCategory } from '../types';
+import { User, Post, PostCategory, Event, RSVP } from '../types';
 import PostCard from './PostCard';
+import EventCard from './EventCard';
 import PostSkeleton from './PostSkeleton';
 import { MapPin, Calendar, Edit2, Anchor, Heart } from 'lucide-react';
 import EditProfileModal from './EditProfileModal';
 import RoleBadge from './RoleBadge';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface ProfileViewProps {
   user: User;
@@ -22,6 +23,7 @@ interface ProfileViewProps {
   isFollowing: boolean;
   allPosts: Post[];
   setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
+  onHashtagClick?: (tag: string) => void;
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ 
@@ -36,14 +38,49 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   onFollow,
   isFollowing,
   allPosts,
-  setNotification 
+  setNotification,
+  onHashtagClick
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isFollowingLocal, setIsFollowingLocal] = useState(isFollowing);
-  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes' | 'events'>('posts');
   const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [userEvents, setUserEvents] = useState<Event[]>([]);
+  const [userRsvps, setUserRsvps] = useState<RSVP[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const isOwnProfile = currentUser?.id === user.id;
+
+  useEffect(() => {
+    if (activeTab === 'events') {
+      setLoadingEvents(true);
+      // 1. Get RSVPs for this user
+      const rsvpQuery = query(
+        collection(db, 'rsvps'),
+        where('userId', '==', user.id)
+      );
+
+      const unsubscribeRsvps = onSnapshot(rsvpQuery, async (snapshot) => {
+        const rsvps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RSVP));
+        setUserRsvps(rsvps);
+
+        // 2. Get the actual events
+        if (rsvps.length > 0) {
+          const eventPromises = rsvps.map(rsvp => getDoc(doc(db, 'events', rsvp.eventId)));
+          const eventSnapshots = await Promise.all(eventPromises);
+          const events = eventSnapshots
+            .filter(snap => snap.exists())
+            .map(snap => ({ id: snap.id, ...snap.data() } as Event));
+          setUserEvents(events);
+        } else {
+          setUserEvents([]);
+        }
+        setLoadingEvents(false);
+      });
+
+      return () => unsubscribeRsvps();
+    }
+  }, [user.id, activeTab]);
 
   useEffect(() => {
     const q = query(
@@ -73,6 +110,34 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   const handleFollowClick = async () => {
     await onFollow(user.id);
     setIsFollowingLocal(!isFollowingLocal);
+  };
+
+  const handleRSVP = async (eventId: string, status: 'going' | 'interested') => {
+    if (!currentUser) return;
+    try {
+      const rsvpRef = doc(db, 'rsvps', `${currentUser.id}_${eventId}`);
+      await setDoc(rsvpRef, {
+        userId: currentUser.id,
+        eventId: eventId,
+        status: status,
+        timestamp: serverTimestamp()
+      });
+      setNotification({ message: `RSVP updated: ${status}`, type: 'success' });
+    } catch (error) {
+      console.error("Error updating RSVP:", error);
+      setNotification({ message: 'Failed to update RSVP', type: 'error' });
+    }
+  };
+
+  const handleAddToCalendar = (event: Event) => {
+    const title = encodeURIComponent(event.title);
+    const details = encodeURIComponent(event.description);
+    const location = encodeURIComponent(event.location);
+    const startDate = event.date.toDate().toISOString().replace(/-|:|\.\d\d\d/g, "");
+    const endDate = new Date(event.date.toDate().getTime() + 2 * 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, "");
+    
+    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${startDate}/${endDate}`;
+    window.open(googleCalendarUrl, '_blank');
   };
 
   return (
@@ -185,11 +250,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-8 border-b border-border mb-6 px-4">
+      <div className="flex items-center gap-8 border-b border-border mb-6 px-4 overflow-x-auto">
         {[
           { id: 'posts', label: 'Posts' },
           { id: 'media', label: 'Media' },
-          { id: 'likes', label: 'Likes' }
+          { id: 'likes', label: 'Likes' },
+          { id: 'events', label: 'Events' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -252,6 +318,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                         onReport={onReport}
                         allPosts={allPosts}
                         setNotification={setNotification}
+                        onHashtagClick={onHashtagClick}
                       />
                     </motion.div>
                   ))}
@@ -299,12 +366,39 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                       onReport={onReport}
                       allPosts={allPosts}
                       setNotification={setNotification}
+                      onHashtagClick={onHashtagClick}
                     />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-20 card bg-surface/30 border-dashed">
                   <p className="text-secondary font-medium">No liked posts yet.</p>
+                </div>
+              )
+            )}
+
+            {activeTab === 'events' && (
+              loadingEvents ? (
+                <div className="space-y-4">
+                  {[1, 2].map(i => (
+                    <div key={i} className="card h-48 animate-pulse bg-surface/50" />
+                  ))}
+                </div>
+              ) : userEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {userEvents.map(event => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      rsvp={userRsvps.find(r => r.eventId === event.id)}
+                      onRSVP={handleRSVP}
+                      onAddToCalendar={handleAddToCalendar}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 card bg-surface/30 border-dashed">
+                  <p className="text-secondary font-medium">No events yet.</p>
                 </div>
               )
             )}
