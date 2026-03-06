@@ -11,7 +11,8 @@ import {
   Users,
   Bell,
   Shield,
-  Camera
+  Camera,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, googleProvider } from './firebase';
@@ -42,7 +43,7 @@ import {
   getDocs,
   where
 } from 'firebase/firestore';
-import { User, Post, Notification } from './types';
+import { User, Post, Notification, IslandRole, PostCategory } from './types';
 
 // Components
 import Navbar from './components/Navbar';
@@ -55,6 +56,7 @@ import ProfileView from './components/ProfileView';
 import PostSkeleton from './components/PostSkeleton';
 import AdminSettings from './components/AdminSettings';
 import NotificationsView from './components/NotificationsView';
+import EventsView from './components/EventsView';
 import { reportPost } from './services/reportService';
 
 export default function App() {
@@ -67,6 +69,7 @@ export default function App() {
   const [reportReason, setReportReason] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostImage, setNewPostImage] = useState('');
+  const [newPostCategory, setNewPostCategory] = useState<PostCategory>('Gili Vibes');
   const [initializing, setInitializing] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
@@ -173,9 +176,9 @@ export default function App() {
   // Posts Listener
   useEffect(() => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedPosts = snapshot.docs.map(doc => {
-        const data = doc.data();
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const fetchedPosts = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+        const data = docSnapshot.data();
         // Convert Firestore timestamp to string for UI
         let timestamp = 'Just now';
         if (data.createdAt instanceof Timestamp) {
@@ -187,15 +190,44 @@ export default function App() {
           else timestamp = date.toLocaleDateString();
         }
 
+        let userAvatar = data.userAvatar;
+        let userName = data.userName;
+        let userRole = data.userRole;
+
+        if (!userAvatar || !userName) {
+             try {
+                 const userDocRef = doc(db, 'users', data.userId);
+                 const userDocSnap = await getDoc(userDocRef);
+                 if (userDocSnap.exists()) {
+                     const userData = userDocSnap.data() as User;
+                     userAvatar = userData.profilePictureUrl || userData.avatar;
+                     userName = userData.displayName || userData.username || userData.name;
+                     userRole = userData.role;
+                 }
+             } catch (e) {
+                 console.error("Error fetching user for post:", e);
+             }
+        }
+
         return {
-          id: doc.id,
+          id: docSnapshot.id,
           userId: data.userId,
           content: data.content,
           createdAt: data.createdAt,
+          timestamp: timestamp, // Use formatted timestamp string
           mediaUrl: data.mediaUrl,
           mediaType: data.mediaType,
+          category: data.category,
+          userAvatar,
+          userName,
+          userRole,
+          location: data.location,
+          likes: data.likes || 0,
+          likedBy: data.likedBy || [],
+          replyCount: data.replyCount || 0,
+          parentId: data.parentId
         } as Post;
-      });
+      }));
       setPosts(fetchedPosts);
       setLoadingPosts(false);
     });
@@ -223,23 +255,36 @@ export default function App() {
     }
   }, [user]);
 
-  const handleAuth = async (email: string, pass: string, name?: string) => {
-    if (name) {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-      const newUser: User = {
-        id: userCredential.user.uid,
-        username: name,
-        email: email,
-        createdAt: Timestamp.now(),
-        displayName: name,
-        profilePictureUrl: `https://picsum.photos/seed/${userCredential.user.uid}/100`,
-      };
-      await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
-      setUser(newUser);
-    } else {
-      await signInWithEmailAndPassword(auth, email, pass);
+  const handleAuth = async (email: string, pass: string, name?: string, role?: IslandRole) => {
+    try {
+      if (name) {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const newUser: User = {
+          id: userCredential.user.uid,
+          username: name,
+          email: email,
+          createdAt: Timestamp.now(),
+          displayName: name,
+          profilePictureUrl: `https://picsum.photos/seed/${userCredential.user.uid}/100`,
+          role: role || 'Tourist',
+        };
+        await setDoc(doc(db, 'users', userCredential.user.uid), newUser);
+        setUser(newUser);
+      } else {
+        await signInWithEmailAndPassword(auth, email, pass);
+      }
+      setView('feed');
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      let message = 'Authentication failed. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        message = 'This email is already in use.';
+      } else if (error.code === 'auth/invalid-credential') {
+        message = 'Invalid email or password.';
+      }
+      setNotification({ message, type: 'error' });
+      throw new Error(message);
     }
-    setView('feed');
   };
 
   const handleGoogleAuth = async () => {
@@ -253,7 +298,7 @@ export default function App() {
     setView('landing');
   };
 
-  const handleCreatePost = async (content: string, mediaUrl?: string, mediaType?: string, parentId?: string) => {
+  const handleCreatePost = async (content: string, mediaUrl?: string, category?: PostCategory, parentId?: string) => {
     if (!content.trim() || !user) return;
     
     try {
@@ -261,8 +306,16 @@ export default function App() {
         userId: user.id,
         content: content,
         mediaUrl: mediaUrl?.trim() || null,
-        mediaType: mediaType || null,
-        createdAt: serverTimestamp()
+        mediaType: mediaUrl ? (mediaUrl.match(/\.(mp4|webm)$/i) ? 'video' : 'image') : null,
+        createdAt: serverTimestamp(),
+        category: category || 'Gili Vibes',
+        userAvatar: user.profilePictureUrl || user.avatar,
+        userName: user.displayName || user.username || user.name,
+        userRole: user.role,
+        parentId: parentId || null,
+        likes: 0,
+        likedBy: [],
+        replyCount: 0
       };
 
       await addDoc(collection(db, 'posts'), postData);
@@ -513,7 +566,6 @@ export default function App() {
               {view === 'profile' && (selectedUser || user) && (
                 <ProfileView 
                   user={selectedUser || user!} 
-                  posts={posts} 
                   currentUser={user}
                   onDelete={handleDeletePost}
                   onUpdate={handleUpdatePost}
@@ -524,12 +576,14 @@ export default function App() {
                   onReport={(postId) => setShowReportModal({ show: true, postId })}
                   isFollowing={user ? (selectedUser || user!).followers?.includes(user.id) || false : false}
                   allPosts={posts}
-                  loadingPosts={loadingPosts}
                   setNotification={setNotification}
                 />
               )}
               {view === 'notification' && (
                 <NotificationsView notifications={notifications} />
+              )}
+              {view === 'events' && (
+                <EventsView user={user} setNotification={setNotification} />
               )}
             </div>
 
@@ -547,14 +601,17 @@ export default function App() {
         onClose={() => setShowCreateModal(false)}
         content={newPostContent}
         onContentChange={setNewPostContent}
-        mediaUrl={newPostImage}
-        onMediaUrlChange={setNewPostImage}
+        image={newPostImage}
+        onImageChange={setNewPostImage}
+        category={newPostCategory}
+        onCategoryChange={setNewPostCategory}
         user={user}
         setNotification={setNotification}
         onSubmit={async () => {
-          await handleCreatePost(newPostContent, newPostImage);
+          await handleCreatePost(newPostContent, newPostImage, newPostCategory);
           setNewPostContent('');
           setNewPostImage('');
+          setNewPostCategory('Gili Vibes');
           setShowCreateModal(false);
           setNotification({ message: 'Post created successfully!', type: 'success' });
         }}
@@ -619,6 +676,7 @@ export default function App() {
           {[
             { id: 'feed', icon: Home },
             { id: 'gili-vibes', icon: Camera },
+            { id: 'events', icon: Calendar },
             { id: 'friends', icon: Users },
             { id: 'notification', icon: Bell },
             { id: 'profile', icon: UserIcon }

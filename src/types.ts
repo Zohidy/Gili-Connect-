@@ -12,16 +12,31 @@ export interface User {
   bio?: string;
   profilePictureUrl?: string;
   role?: IslandRole;
+  name?: string;
+  avatar?: string;
+  coverImage?: string;
+  location?: string;
+  giliConnection?: string;
+  interests?: string[];
 }
 
 export interface Post {
   id: string;
   userId: string;
   content: string;
-  createdAt: Timestamp;
+  createdAt: Timestamp | string;
+  timestamp?: string;
   mediaUrl?: string;
   mediaType?: string;
   category?: PostCategory;
+  userAvatar?: string;
+  userName?: string;
+  userRole?: IslandRole;
+  location?: string;
+  likes?: number;
+  likedBy?: string[];
+  replyCount?: number;
+  parentId?: string;
 }
 
 export interface Like {
@@ -71,4 +86,21 @@ export interface Notification {
   postId?: string;
   timestamp: string;
   read: boolean;
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  description: string;
+  date: Timestamp;
+  location: string;
+  imageUrl?: string;
+  organizerId: string;
+}
+
+export interface RSVP {
+  id: string;
+  eventId: string;
+  userId: string;
+  status: 'going' | 'interested';
 }

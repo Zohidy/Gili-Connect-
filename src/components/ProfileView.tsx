@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { User, Post, PostCategory } from '../types';
 import PostCard from './PostCard';
@@ -6,10 +6,11 @@ import PostSkeleton from './PostSkeleton';
 import { MapPin, Calendar, Edit2, Anchor, Heart } from 'lucide-react';
 import EditProfileModal from './EditProfileModal';
 import RoleBadge from './RoleBadge';
+import { db } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 
 interface ProfileViewProps {
   user: User;
-  posts: Post[];
   currentUser: User | null;
   onDelete: (id: string) => void;
   onUpdate: (id: string, content: string) => void;
@@ -20,13 +21,11 @@ interface ProfileViewProps {
   onFollow: (userId: string) => Promise<void>;
   isFollowing: boolean;
   allPosts: Post[];
-  loadingPosts: boolean;
   setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ 
   user, 
-  posts, 
   currentUser, 
   onDelete, 
   onUpdate, 
@@ -37,17 +36,33 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   onFollow,
   isFollowing,
   allPosts,
-  loadingPosts,
   setNotification 
 }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isFollowingLocal, setIsFollowingLocal] = useState(isFollowing);
   const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes'>('posts');
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
   const isOwnProfile = currentUser?.id === user.id;
 
-  const userPosts = posts.filter(p => p.userId === user.id && !p.parentId);
+  useEffect(() => {
+    const q = query(
+      collection(db, 'posts'),
+      where('userId', '==', user.id),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+      setUserPosts(posts);
+      setLoadingPosts(false);
+    });
+
+    return () => unsubscribe();
+  }, [user.id]);
+
   const mediaPosts = userPosts.filter(p => p.image);
-  const likedPosts = posts.filter(p => p.likedBy?.includes(user.id));
+  const likedPosts = allPosts.filter(p => p.likedBy?.includes(user.id));
 
   const stats = [
     { label: 'Posts', value: userPosts.length },

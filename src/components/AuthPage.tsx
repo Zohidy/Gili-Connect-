@@ -93,7 +93,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
             <div>
               <label className="block text-xs font-semibold text-secondary uppercase mb-2">Island Role</label>
               <div className="grid grid-cols-3 gap-2">
-                {(['Tourist', 'Local', 'Business', 'Moderator', 'Supporter'] as IslandRole[]).map(r => (
+                {(['Tourist', 'Local', 'Business', 'Supporter'] as IslandRole[]).map(r => (
                   <button
                     key={r}
                     type="button"
