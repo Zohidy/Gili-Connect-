@@ -4,7 +4,7 @@ import { User, Post, PostCategory, Event, RSVP } from '../types';
 import PostCard from './PostCard';
 import EventCard from './EventCard';
 import PostSkeleton from './PostSkeleton';
-import { MapPin, Calendar, Edit2, Anchor, Heart } from 'lucide-react';
+import { MapPin, Calendar, Edit2, Anchor, Heart, MessageCircle } from 'lucide-react';
 import EditProfileModal from './EditProfileModal';
 import RoleBadge from './RoleBadge';
 import { db } from '../firebase';
@@ -24,6 +24,8 @@ interface ProfileViewProps {
   allPosts: Post[];
   setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
   onHashtagClick?: (tag: string) => void;
+  showEditModal: boolean;
+  setShowEditModal: (show: boolean) => void;
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ 
@@ -39,9 +41,10 @@ const ProfileView: React.FC<ProfileViewProps> = ({
   isFollowing,
   allPosts,
   setNotification,
-  onHashtagClick
+  onHashtagClick,
+  showEditModal,
+  setShowEditModal
 }) => {
-  const [showEditModal, setShowEditModal] = useState(false);
   const [isFollowingLocal, setIsFollowingLocal] = useState(isFollowing);
   const [activeTab, setActiveTab] = useState<'posts' | 'media' | 'likes' | 'events'>('posts');
   const [userPosts, setUserPosts] = useState<Post[]>([]);
@@ -76,6 +79,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({
           setUserEvents([]);
         }
         setLoadingEvents(false);
+      }, (error) => {
+        console.error("Error in RSVPs snapshot:", error);
+        setLoadingEvents(false);
       });
 
       return () => unsubscribeRsvps();
@@ -98,18 +104,21 @@ const ProfileView: React.FC<ProfileViewProps> = ({
       });
       setUserPosts(posts);
       setLoadingPosts(false);
+    }, (error) => {
+      console.error("Error in user posts snapshot:", error);
+      setLoadingPosts(false);
     });
 
     return () => unsubscribe();
   }, [user.id]);
 
-  const mediaPosts = userPosts.filter(p => p.image);
+  const mediaPosts = userPosts.filter(p => p.mediaUrl);
   const likedPosts = allPosts.filter(p => p.likedBy?.includes(user.id));
 
   const stats = [
-    { label: 'Posts', value: userPosts.length },
-    { label: 'Followers', value: user.followers?.length || 0 },
-    { label: 'Following', value: user.following?.length || 0 },
+    { label: 'Postingan', value: userPosts.length },
+    { label: 'Pengikut', value: user.followers?.length || 0 },
+    { label: 'Mengikuti', value: user.following?.length || 0 },
   ];
 
   const handleFollowClick = async () => {
@@ -179,7 +188,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                   className="flex items-center gap-2 px-6 py-2.5 bg-[#1a2e35]/5 text-[#1a2e35] rounded-2xl font-bold text-sm hover:bg-[#1a2e35]/10 transition-all"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Edit Profile
+                  Edit Profil
                 </button>
               ) : currentUser && (
                 <button 
@@ -190,7 +199,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                       : 'bg-accent text-white hover:bg-accent/90 shadow-accent/20'
                   }`}
                 >
-                  {isFollowingLocal ? 'Unfollow' : 'Follow'}
+                  {isFollowingLocal ? 'Batal Ikuti' : 'Ikuti'}
                 </button>
               )}
             </div>
@@ -199,42 +208,44 @@ const ProfileView: React.FC<ProfileViewProps> = ({
           {/* User Info */}
           <div className="text-left mb-8">
             <div className="flex items-center gap-3 mb-1">
-              <h3 className="text-3xl font-black text-[#1a2e35] tracking-tighter">{user.displayName || user.name || user.username}</h3>
+              <h3 className="text-3xl font-black text-primary tracking-tighter">{user.displayName || user.name || user.username}</h3>
               <RoleBadge role={user.role} />
             </div>
-            <p className="text-[#1a2e35]/60 font-bold mb-4">@{(user.email || '').split('@')[0]}</p>
+            <p className="text-secondary font-bold mb-4">@{(user.email || '').split('@')[0]}</p>
             
             {user.bio && (
-              <p className="text-[15px] leading-relaxed text-[#1a2e35]/80 max-w-2xl mb-6">
-                {user.bio}
-              </p>
+              <div className="relative mb-6">
+                <p className="text-[15px] leading-relaxed text-primary/80 max-w-2xl pl-4 border-l-2 border-accent/30 italic">
+                  "{user.bio}"
+                </p>
+              </div>
             )}
 
             <div className="flex flex-wrap gap-6 mb-8">
               {user.location && (
-                <div className="flex items-center gap-2 text-sm text-[#1a2e35]/60 font-bold">
+                <div className="flex items-center gap-2 text-sm text-secondary font-bold">
                   <MapPin className="w-4 h-4 text-accent" />
                   {user.location}
                 </div>
               )}
               {user.giliConnection && (
-                <div className="flex items-center gap-2 text-sm text-accent font-bold">
+                <div className="flex items-center gap-2 text-sm text-accent font-bold bg-accent/5 px-3 py-1 rounded-lg border border-accent/10">
                   <Anchor className="w-4 h-4" />
                   {user.giliConnection}
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-[#1a2e35]/60 font-bold">
+              <div className="flex items-center gap-2 text-sm text-secondary font-bold">
                 <Calendar className="w-4 h-4" />
-                Joined {user.joinedAt || '2024'}
+                Bergabung {user.createdAt ? (user.createdAt instanceof Object && 'toDate' in user.createdAt ? user.createdAt.toDate().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : '2024') : '2024'}
               </div>
             </div>
 
             {/* Stats */}
-            <div className="flex gap-8 py-6 border-y border-[#1a2e35]/10">
+            <div className="flex gap-8 py-6 border-y border-border">
               {stats.map(stat => (
                 <div key={stat.label} className="flex flex-col">
-                  <span className="text-xl font-black text-[#1a2e35] tracking-tight">{stat.value}</span>
-                  <span className="text-xs font-bold text-[#1a2e35]/50 uppercase tracking-widest">{stat.label}</span>
+                  <span className="text-xl font-black text-primary tracking-tight">{stat.value}</span>
+                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">{stat.label}</span>
                 </div>
               ))}
             </div>
@@ -254,18 +265,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-8 border-b border-[#1a2e35]/10 mb-6 px-4 overflow-x-auto">
+      <div className="flex items-center gap-8 border-b border-border mb-6 px-4 overflow-x-auto">
         {[
-          { id: 'posts', label: 'Posts' },
+          { id: 'posts', label: 'Postingan' },
           { id: 'media', label: 'Media' },
-          { id: 'likes', label: 'Likes' },
-          { id: 'events', label: 'Events' }
+          { id: 'likes', label: 'Suka' },
+          { id: 'events', label: 'Acara' }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`pb-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
-              activeTab === tab.id ? 'text-accent' : 'text-[#1a2e35]/50 hover:text-[#1a2e35]'
+              activeTab === tab.id ? 'text-accent' : 'text-secondary hover:text-primary'
             }`}
           >
             {tab.label}
@@ -329,7 +340,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 </motion.div>
               ) : (
                 <div className="text-center py-20 card bg-surface/30 border-dashed">
-                  <p className="text-secondary font-medium">No posts yet.</p>
+                  <p className="text-secondary font-medium">Belum ada postingan.</p>
                 </div>
               )
             )}
@@ -339,10 +350,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {mediaPosts.map(post => (
                     <div key={post.id} className="aspect-square rounded-2xl overflow-hidden border border-border group relative cursor-pointer">
-                      <img src={post.image} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                      {post.mediaType === 'video' ? (
+                        <video src={post.mediaUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      ) : (
+                        <img src={post.mediaUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
+                      )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                          <div className="flex items-center gap-4 text-white font-bold">
-                            <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes}</span>
+                            <span className="flex items-center gap-1"><Heart className="w-4 h-4 fill-white" /> {post.likes || 0}</span>
+                            <span className="flex items-center gap-1"><MessageCircle className="w-4 h-4 fill-white" /> {post.replyCount || 0}</span>
                          </div>
                       </div>
                     </div>
@@ -350,7 +366,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
               ) : (
                 <div className="text-center py-20 card bg-surface/30 border-dashed">
-                  <p className="text-secondary font-medium">No media posts yet.</p>
+                  <p className="text-secondary font-medium">Belum ada postingan media.</p>
                 </div>
               )
             )}
@@ -376,7 +392,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
               ) : (
                 <div className="text-center py-20 card bg-surface/30 border-dashed">
-                  <p className="text-secondary font-medium">No liked posts yet.</p>
+                  <p className="text-secondary font-medium">Belum ada postingan yang disukai.</p>
                 </div>
               )
             )}
@@ -402,7 +418,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
               ) : (
                 <div className="text-center py-20 card bg-surface/30 border-dashed">
-                  <p className="text-secondary font-medium">No events yet.</p>
+                  <p className="text-secondary font-medium">Belum ada acara.</p>
                 </div>
               )
             )}

@@ -69,14 +69,14 @@ const ReplySection: React.FC<ReplySectionProps> = ({
                         type="text"
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder="Write a reply..."
+                        placeholder="Tulis balasan..."
                         className="flex-1 bg-background border border-border rounded-2xl px-5 py-2 text-sm focus:border-accent outline-none transition-colors"
                         onKeyDown={(e) => e.key === 'Enter' && handleReply()}
                       />
                       <button 
                         onClick={() => replyFileInputRef.current?.click()}
                         className={`p-2.5 rounded-xl border border-border hover:bg-border/50 transition-colors ${replyImage ? 'text-accent border-accent/30 bg-accent/5' : 'text-secondary'}`}
-                        title="Add image to reply"
+                        title="Tambah gambar ke balasan"
                       >
                         <ImageIcon className="w-4 h-4" />
                       </button>
@@ -104,7 +104,7 @@ const ReplySection: React.FC<ReplySectionProps> = ({
                     {isUploadingReplyImage && (
                       <div className="flex items-center gap-2 text-[10px] font-bold text-secondary uppercase tracking-widest">
                         <Loader2 className="w-3 h-3 animate-spin text-accent" />
-                        Uploading...
+                        Mengunggah...
                       </div>
                     )}
                   </div>
@@ -139,7 +139,7 @@ const ReplySection: React.FC<ReplySectionProps> = ({
                 ))
               ) : (
                 <div className="text-center py-4 text-xs text-secondary font-medium italic">
-                  No replies yet.
+                  Belum ada balasan.
                 </div>
               )}
             </div>

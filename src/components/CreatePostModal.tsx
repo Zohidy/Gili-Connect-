@@ -4,6 +4,9 @@ import { X, Image as ImageIcon, Loader2, Trash2, MapPin, Smile, Hash, Send } fro
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { PostCategory, User } from '../types';
 import { uploadFile } from '../services/storageService';
+import ImageCropper from './ImageCropper';
+
+import { Language, translations } from '../translations';
 
 interface CreatePostModalProps {
   show: boolean;
@@ -17,17 +20,8 @@ interface CreatePostModalProps {
   onSubmit: (location?: string) => Promise<void>;
   user: User | null;
   setNotification: (notification: { message: string; type: 'success' | 'error' } | null) => void;
+  language: Language;
 }
-
-const CATEGORIES: { id: PostCategory; label: string; icon: string }[] = [
-  { id: 'News', label: 'News', icon: '📢' },
-  { id: 'Party', label: 'Party', icon: '🎉' },
-  { id: 'Fastboat', label: 'Fastboat', icon: '🚤' },
-  { id: 'Safety', label: 'Safety', icon: '🛡️' },
-  { id: 'Food', label: 'Food', icon: '🍱' },
-  { id: 'Marketplace', label: 'Market', icon: '🛒' },
-  { id: 'Lost and Found', label: 'Lost & Found', icon: '🔍' },
-];
 
 const CreatePostModal: React.FC<CreatePostModalProps> = ({
   show,
@@ -40,10 +34,23 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
   onCategoryChange,
   onSubmit,
   user,
-  setNotification
+  setNotification,
+  language
 }) => {
+  const t = translations[language] || translations['id'];
+  const CATEGORIES: { id: PostCategory; label: string; icon: string }[] = [
+    { id: 'News', label: language === 'id' ? 'Berita' : 'News', icon: '📢' },
+    { id: 'Party', label: language === 'id' ? 'Pesta' : 'Party', icon: '🎉' },
+    { id: 'Fastboat', label: 'Fastboat', icon: '🚤' },
+    { id: 'Safety', label: language === 'id' ? 'Keamanan' : 'Safety', icon: '🛡️' },
+    { id: 'Food', label: language === 'id' ? 'Makanan' : 'Food', icon: '🍱' },
+    { id: 'Marketplace', label: language === 'id' ? 'Pasar' : 'Marketplace', icon: '🛒' },
+    { id: 'Lost and Found', label: language === 'id' ? 'Hilang & Temu' : 'Lost & Found', icon: '🔍' },
+  ];
+
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showLocationInput, setShowLocationInput] = useState(false);
@@ -54,18 +61,31 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
   const handleFileChange = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setNotification({ message: 'Please upload an image file.', type: 'error' });
+      setNotification({ message: language === 'id' ? 'Silakan unggah file gambar.' : 'Please upload an image file.', type: 'error' });
       return;
     }
 
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImageToCrop(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedImage: string) => {
+    setImageToCrop(null);
     try {
       setIsUploading(true);
+      // Convert base64 to blob for upload
+      const response = await fetch(croppedImage);
+      const blob = await response.blob();
+      const file = new File([blob], 'post.jpg', { type: 'image/jpeg' });
       const url = await uploadFile(file);
       onImageChange(url);
-      setNotification({ message: 'Successfully uploaded image.', type: 'success' });
+      setNotification({ message: language === 'id' ? 'Gambar berhasil diunggah.' : 'Image uploaded successfully.', type: 'success' });
     } catch (error) {
       console.error("Error uploading post image:", error);
-      setNotification({ message: error instanceof Error ? error.message : 'Failed to upload image.', type: 'error' });
+      setNotification({ message: error instanceof Error ? error.message : (language === 'id' ? 'Gagal mengunggah gambar.' : 'Failed to upload image.'), type: 'error' });
     } finally {
       setIsUploading(false);
     }
@@ -103,6 +123,13 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
     <AnimatePresence>
       {show && (
         <div className="fixed inset-0 z-[100] flex md:items-center justify-center md:p-4">
+          {imageToCrop && (
+            <ImageCropper
+              image={imageToCrop}
+              onCropComplete={handleCropComplete}
+              onCancel={() => setImageToCrop(null)}
+            />
+          )}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -114,7 +141,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="card w-full max-w-xl md:rounded-3xl relative z-10 overflow-hidden shadow-2xl h-full md:h-auto flex flex-col"
+            className="neo-card w-full max-w-xl relative z-10 overflow-hidden shadow-2xl h-full md:h-auto flex flex-col"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
@@ -124,13 +151,13 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
               >
                 <X className="w-6 h-6" />
               </button>
-              <h3 className="text-lg font-bold text-primary">Create Post</h3>
+              <h3 className="text-lg font-bold text-primary">{t.createPost}</h3>
               <button 
                 onClick={handlePostSubmit}
                 disabled={isUploading || isSubmitting || !content.trim()}
                 className="btn-primary px-6 py-2 rounded-full font-bold disabled:opacity-50"
               >
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Post'}
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : t.send}
               </button>
             </div>
             
@@ -152,7 +179,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   <textarea 
                     value={content}
                     onChange={(e) => onContentChange(e.target.value.slice(0, MAX_CHARS))}
-                    placeholder="What's happening on Gili T?"
+                    placeholder={t.whatHappening}
                     className="w-full h-40 bg-transparent text-lg text-primary placeholder:text-secondary/50 outline-none resize-none pt-2"
                     autoFocus
                   />
@@ -185,7 +212,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Hash className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">Select Category</span>
+                  <span className="text-xs font-bold text-secondary uppercase tracking-widest">{t.selectCategory}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {CATEGORIES.map(cat => (
@@ -213,14 +240,14 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading || !!image}
                   className="p-3 text-accent hover:bg-accent/10 rounded-full transition-colors disabled:opacity-30"
-                  title="Add Photo"
+                  title={language === 'id' ? 'Tambah Foto' : 'Add Photo'}
                 >
                   <ImageIcon className="w-6 h-6" />
                 </button>
                 <button 
                   onClick={() => setShowLocationInput(!showLocationInput)}
                   className={`p-3 rounded-full transition-colors ${showLocationInput ? 'bg-accent/10 text-accent' : 'text-accent hover:bg-accent/10'}`} 
-                  title="Add Location"
+                  title={language === 'id' ? 'Tambah Lokasi' : 'Add Location'}
                 >
                   <MapPin className="w-6 h-6" />
                 </button>

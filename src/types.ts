@@ -37,6 +37,7 @@ export interface Post {
   likedBy?: string[];
   replyCount?: number;
   parentId?: string;
+  communityId?: string;
 }
 
 export interface Like {

@@ -17,6 +17,8 @@ const EventsView: React.FC<EventsViewProps> = ({ user, setNotification }) => {
     const eventsQuery = query(collection(db, 'events'), orderBy('date', 'asc'));
     const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
       setEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Event)));
+    }, (error) => {
+      console.error("Error in events snapshot:", error);
     });
 
     let unsubscribeRsvps = () => {};
@@ -24,6 +26,8 @@ const EventsView: React.FC<EventsViewProps> = ({ user, setNotification }) => {
       const rsvpsQuery = query(collection(db, 'rsvps'), where('userId', '==', user.id));
       unsubscribeRsvps = onSnapshot(rsvpsQuery, (snapshot) => {
         setRsvps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RSVP)));
+      }, (error) => {
+        console.error("Error in user RSVPs snapshot:", error);
       });
     }
 
@@ -40,7 +44,7 @@ const EventsView: React.FC<EventsViewProps> = ({ user, setNotification }) => {
       await setDoc(rsvpRef, { eventId, userId: user.id, status });
     } catch (error) {
       console.error("RSVP error:", error);
-      setNotification({ message: 'Failed to RSVP. Please try again.', type: 'error' });
+      setNotification({ message: 'Gagal melakukan RSVP. Silakan coba lagi.', type: 'error' });
     }
   };
 
@@ -53,7 +57,7 @@ const EventsView: React.FC<EventsViewProps> = ({ user, setNotification }) => {
 
   return (
     <div className="space-y-6 pb-20">
-      <h2 className="text-3xl font-black text-primary tracking-tight px-4">Upcoming Events</h2>
+      <h2 className="text-3xl font-black text-primary tracking-tight px-4">Acara Mendatang</h2>
       <div className="space-y-4 px-4">
         {events.map(event => (
           <EventCard 

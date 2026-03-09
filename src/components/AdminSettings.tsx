@@ -3,22 +3,35 @@ import { collection, query, orderBy, onSnapshot, doc, updateDoc, getDocs } from 
 import { db } from '../firebase';
 import { Report, User } from '../types';
 
-const AdminSettings: React.FC = () => {
+interface AdminSettingsProps {
+  currentUser: User | null;
+}
+
+const AdminSettings: React.FC<AdminSettingsProps> = ({ currentUser }) => {
   const [reports, setReports] = useState<Report[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+
+  const isAdmin = currentUser?.role === 'Admin';
+  const isModerator = currentUser?.role === 'Moderator';
 
   useEffect(() => {
     const q = query(collection(db, 'reports'), orderBy('timestamp', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setReports(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report)));
+    }, (error) => {
+      console.error("Error in reports snapshot:", error);
     });
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const snapshot = await getDocs(collection(db, 'users'));
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+      try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      }
     };
     fetchUsers();
   }, []);
@@ -33,25 +46,27 @@ const AdminSettings: React.FC = () => {
     <div className="bg-surface border border-border rounded-xl p-6 space-y-8">
       <h3 className="text-xl font-bold">Admin Settings</h3>
       
-      <div>
-        <h4 className="text-lg font-bold mb-4">Manage Moderators</h4>
-        <div className="space-y-4">
-          {users.map(user => (
-            <div key={user.id} className="flex items-center justify-between p-4 border border-border rounded-xl">
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-xs text-secondary">{user.role}</p>
+      {isAdmin && (
+        <div>
+          <h4 className="text-lg font-bold mb-4">Manage Moderators</h4>
+          <div className="space-y-4">
+            {users.map(user => (
+              <div key={user.id} className="flex items-center justify-between p-4 border border-border rounded-xl">
+                <div>
+                  <p className="font-semibold">{user.name || user.displayName}</p>
+                  <p className="text-xs text-secondary">{user.role}</p>
+                </div>
+                <button 
+                  onClick={() => toggleModerator(user)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold ${user.role === 'Moderator' ? 'bg-red-500/10 text-red-500' : 'bg-accent/10 text-accent'}`}
+                >
+                  {user.role === 'Moderator' ? 'Demote' : 'Promote'}
+                </button>
               </div>
-              <button 
-                onClick={() => toggleModerator(user)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold ${user.role === 'Moderator' ? 'bg-red-500/10 text-red-500' : 'bg-accent/10 text-accent'}`}
-              >
-                {user.role === 'Moderator' ? 'Demote' : 'Promote'}
-              </button>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div>
         <h4 className="text-lg font-bold mb-4">Reported Posts</h4>

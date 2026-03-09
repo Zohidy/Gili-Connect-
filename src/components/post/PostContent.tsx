@@ -42,13 +42,13 @@ const PostContent: React.FC<PostContentProps> = ({
             }}
             className="flex items-center gap-2 px-4 py-2 text-secondary hover:text-primary transition-colors text-xs font-bold uppercase tracking-wider"
           >
-            Cancel
+            Batal
           </button>
           <button 
             onClick={handleUpdate}
             className="btn-primary px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider"
           >
-            Save Changes
+            Simpan Perubahan
           </button>
         </div>
       </div>
@@ -68,7 +68,7 @@ const PostContent: React.FC<PostContentProps> = ({
           onClick={() => setIsExpanded(!isExpanded)}
           className="text-accent text-xs font-bold mt-2 hover:underline"
         >
-          {isExpanded ? 'Show Less' : 'Read More'}
+          {isExpanded ? 'Sembunyikan' : 'Baca Selengkapnya'}
         </button>
       )}
     </div>

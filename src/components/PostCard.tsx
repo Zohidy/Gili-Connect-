@@ -113,9 +113,9 @@ const PostCard: React.FC<PostCardProps> = ({
     e.stopPropagation();
     if (!currentUser) {
       if (setNotification) {
-        setNotification({ message: 'Please login to like posts', type: 'error' });
+        setNotification({ message: 'Silakan login untuk menyukai postingan', type: 'error' });
       } else {
-        alert('Please login to like posts');
+        alert('Silakan login untuk menyukai postingan');
       }
       return;
     }
@@ -129,10 +129,19 @@ const PostCard: React.FC<PostCardProps> = ({
 
       try {
         await onLike(post.id);
+        if (setNotification) {
+          setNotification({ 
+            message: !previousLiked ? 'Postingan disukai!' : 'Suka dibatalkan!', 
+            type: 'success' 
+          });
+        }
       } catch (error) {
         console.error("Like failed:", error);
         setOptimisticLiked(previousLiked);
         setOptimisticLikes(previousLikes);
+        if (setNotification) {
+          setNotification({ message: 'Gagal menyukai postingan', type: 'error' });
+        }
       } finally {
         setIsLiking(false);
       }
@@ -172,15 +181,15 @@ const PostCard: React.FC<PostCardProps> = ({
     const url = `${window.location.origin}/post/${post.id}`;
     navigator.clipboard.writeText(url);
     if (setNotification) {
-      setNotification({ message: 'Link copied to clipboard!', type: 'success' });
+      setNotification({ message: 'Tautan disalin ke papan klip!', type: 'success' });
     } else {
-      alert('Link copied to clipboard!');
+      alert('Tautan disalin ke papan klip!');
     }
   };
 
   return (
     <div 
-      className={`card overflow-hidden mb-4 ${isReply ? 'ml-8 border-l-2 border-accent/20' : ''}`}
+      className={`memphis-card overflow-hidden mb-4 ${isReply ? 'ml-8 border-l-4 border-primary' : ''}`}
     >
       {previewImage && (
         <AnimatePresence>
@@ -238,11 +247,25 @@ const PostCard: React.FC<PostCardProps> = ({
           formatContent={formatContent}
         />
         
-        <PostImage 
-          image={post.image}
-          isEditing={isEditing}
-          setPreviewImage={setPreviewImage}
-        />
+        {post.mediaUrl && !isEditing && (
+          <div className="mb-4">
+            {post.mediaType === 'video' ? (
+              <div className="relative rounded-2xl overflow-hidden border border-border aspect-video">
+                <video 
+                  src={post.mediaUrl} 
+                  controls 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ) : (
+              <PostImage 
+                image={post.mediaUrl}
+                isEditing={isEditing}
+                setPreviewImage={setPreviewImage}
+              />
+            )}
+          </div>
+        )}
         
         <PostActions 
           handleLike={handleLike}
@@ -282,8 +305,8 @@ const PostCard: React.FC<PostCardProps> = ({
 
       <ConfirmationDialog
         show={showDeleteConfirm}
-        title="Delete Post"
-        message="Are you sure you want to delete this post? This action cannot be undone."
+        title="Hapus Postingan"
+        message="Apakah Anda yakin ingin menghapus postingan ini? Tindakan ini tidak dapat dibatalkan."
         onConfirm={() => {
           onDelete?.(post.id);
           setShowDeleteConfirm(false);

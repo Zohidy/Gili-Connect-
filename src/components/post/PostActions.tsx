@@ -61,7 +61,7 @@ const PostActions: React.FC<PostActionsProps> = ({
         <button 
           onClick={() => onReport?.(post.id)}
           className="flex items-center gap-2 px-3 py-2 rounded-full text-secondary hover:text-red-500 hover:bg-red-500/5 transition-all"
-          title="Report post"
+          title="Laporkan postingan"
         >
           <Flag className="w-[18px] h-[18px]" />
         </button>
@@ -69,7 +69,7 @@ const PostActions: React.FC<PostActionsProps> = ({
       <button 
         onClick={handleShare}
         className="p-2 text-secondary hover:text-accent hover:bg-accent/5 rounded-full transition-all"
-        title="Copy link"
+        title="Salin tautan"
       >
         <Share2 className="w-[18px] h-[18px]" />
       </button>

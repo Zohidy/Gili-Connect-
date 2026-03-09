@@ -9,9 +9,9 @@ interface NotificationsViewProps {
 const NotificationsView: React.FC<NotificationsViewProps> = ({ notifications }) => {
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold mb-6">Notifications</h2>
+      <h2 className="text-2xl font-bold mb-6">Notifikasi</h2>
       {notifications.length === 0 ? (
-        <p className="text-secondary text-center py-10">No new notifications.</p>
+        <p className="text-secondary text-center py-10">Tidak ada notifikasi baru.</p>
       ) : (
         <div className="space-y-2">
           {notifications.map(notification => (
@@ -24,9 +24,9 @@ const NotificationsView: React.FC<NotificationsViewProps> = ({ notifications }) 
               <p className="text-sm">
                 <span className="font-bold">{notification.senderName}</span>
                 {' '}
-                {notification.type === 'like' && 'liked your post'}
-                {notification.type === 'reply' && 'replied to your post'}
-                {notification.type === 'follow' && 'followed you'}
+                {notification.type === 'like' && 'menyukai postingan Anda'}
+                {notification.type === 'reply' && 'membalas postingan Anda'}
+                {notification.type === 'follow' && 'mulai mengikuti Anda'}
               </p>
               <p className="text-xs text-secondary mt-1">
                 {new Date(notification.timestamp).toLocaleString()}

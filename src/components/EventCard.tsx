@@ -22,7 +22,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, rsvp, onRSVP, onAddToCalen
             loading="lazy" 
           />
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">
-            {event.date.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {event.date.toDate().toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
           </div>
         </div>
       )}
@@ -33,7 +33,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, rsvp, onRSVP, onAddToCalen
         <div className="flex items-center gap-6 text-xs text-secondary font-medium mb-5">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-accent" />
-            {event.date.toDate().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            {event.date.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
           </div>
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-accent" />
@@ -50,13 +50,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, rsvp, onRSVP, onAddToCalen
                 : 'bg-surface border border-border text-secondary hover:border-accent/50 hover:bg-border/30'
             }`}
           >
-            {rsvp?.status === 'going' ? '✓ Going' : 'RSVP Going'}
+            {rsvp?.status === 'going' ? '✓ Hadir' : 'RSVP Hadir'}
           </button>
           <button 
             onClick={() => onAddToCalendar(event)}
             className="px-4 py-2.5 rounded-xl text-xs font-bold bg-surface border border-border text-secondary hover:border-accent/50 hover:bg-border/30 transition-all"
           >
-            Add to Calendar
+            Tambah ke Kalender
           </button>
         </div>
       </div>

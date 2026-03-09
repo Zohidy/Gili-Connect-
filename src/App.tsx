@@ -14,7 +14,8 @@ import {
   Camera,
   Calendar,
   Filter,
-  Search
+  Search,
+  ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, db, googleProvider } from './firebase';
@@ -47,9 +48,14 @@ import {
 } from 'firebase/firestore';
 import { User, Post, Notification, IslandRole, PostCategory } from './types';
 import { getUserById } from './services/userService';
+import { likePost } from './services/postService';
+import { Language, translations } from './translations';
 
 // Components
 import MenuView from './components/MenuView';
+import SettingsView from './components/SettingsView';
+import LostFoundView from './components/LostFoundView';
+import MarketplaceView from './components/MarketplaceView';
 import TopBar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import LandingPage from './components/LandingPage';
@@ -63,6 +69,8 @@ import AdminSettings from './components/AdminSettings';
 import NotificationsView from './components/NotificationsView';
 import EventsView from './components/EventsView';
 import TouristWidgets from './components/dashboard/TouristWidgets';
+import GiliMap from './components/GiliMap';
+import CommunityView from './components/CommunityView';
 import { reportPost } from './services/reportService';
 
 export default function App() {
@@ -72,6 +80,7 @@ export default function App() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState<{ show: boolean; postId: string | null }>({ show: false, postId: null });
   const [reportReason, setReportReason] = useState('');
   const [newPostContent, setNewPostContent] = useState('');
@@ -86,9 +95,12 @@ export default function App() {
     window.matchMedia('(prefers-color-scheme: dark)').matches
   );
   const [sortBy, setSortBy] = useState<'latest' | 'likes'>('latest');
+  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
   const [selectedCategory, setSelectedCategory] = useState<PostCategory | 'All'>('All');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [language, setLanguage] = useState<Language>('id');
+  const t = translations[language] || translations['id'];
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -242,6 +254,9 @@ export default function App() {
       }));
       setPosts(fetchedPosts);
       setLoadingPosts(false);
+    }, (error) => {
+      console.error("Posts listener error:", error);
+      setLoadingPosts(false);
     });
 
     return () => unsubscribe();
@@ -351,7 +366,32 @@ export default function App() {
         replyCount: 0
       };
 
-      await addDoc(collection(db, 'posts'), postData);
+      const docRef = await addDoc(collection(db, 'posts'), postData);
+
+      if (parentId) {
+        // Increment reply count on parent post
+        const parentRef = doc(db, 'posts', parentId);
+        await updateDoc(parentRef, {
+          replyCount: increment(1)
+        });
+
+        // Notify parent post owner
+        const parentSnap = await getDoc(parentRef);
+        if (parentSnap.exists()) {
+          const parentData = parentSnap.data();
+          if (parentData.userId !== user.id) {
+            await addDoc(collection(db, 'notifications'), {
+              userId: parentData.userId,
+              type: 'reply',
+              senderId: user.id,
+              senderName: user.displayName || user.username || user.name,
+              postId: parentId,
+              timestamp: serverTimestamp(),
+              read: false
+            });
+          }
+        }
+      }
       
     } catch (error) {
       console.error("Error adding post: ", error);
@@ -362,6 +402,18 @@ export default function App() {
   const handleDeletePost = async (postId: string) => {
     try {
       const postRef = doc(db, 'posts', postId);
+      const postSnap = await getDoc(postRef);
+      
+      if (postSnap.exists()) {
+        const postData = postSnap.data();
+        if (postData.parentId) {
+          const parentRef = doc(db, 'posts', postData.parentId);
+          await updateDoc(parentRef, {
+            replyCount: increment(-1)
+          });
+        }
+      }
+
       await deleteDoc(postRef);
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -420,28 +472,12 @@ export default function App() {
 
   const handleLikePost = async (postId: string) => {
     if (!user) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    const isLiked = post.likedBy?.includes(user.id) || false;
     try {
-      const likeRef = doc(db, 'likes', `${user.id}_${postId}`);
-      const postRef = doc(db, 'posts', postId);
-      const likeSnap = await getDoc(likeRef);
-      
-      if (likeSnap.exists()) {
-        await deleteDoc(likeRef);
-        await updateDoc(postRef, {
-          likes: increment(-1),
-          likedBy: arrayRemove(user.id)
-        });
-      } else {
-        await setDoc(likeRef, {
-          userId: user.id,
-          postId: postId,
-          createdAt: serverTimestamp()
-        });
-        await updateDoc(postRef, {
-          likes: increment(1),
-          likedBy: arrayUnion(user.id)
-        });
-      }
+      await likePost(postId, user.id, isLiked);
     } catch (error) {
       console.error("Error toggling like:", error);
     }
@@ -478,10 +514,28 @@ export default function App() {
   return (
     <div className="min-h-screen pb-20 bg-background text-primary">
       {user && view !== 'landing' && view !== 'login' && view !== 'signup' && (
-        <TopBar onToggleMenu={() => setShowMenu(true)} onNavigate={setView} onCreatePost={() => setShowCreateModal(true)} />
+        <TopBar 
+          onToggleMenu={() => setShowMenu(true)} 
+          onNavigate={setView} 
+          onCreatePost={() => setShowCreateModal(true)} 
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+          language={language}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+        />
       )}
       
-      {showMenu && <MenuView user={user} onClose={() => setShowMenu(false)} onLogout={handleLogout} />}
+      {showMenu && (
+        <MenuView 
+          user={user} 
+          onClose={() => setShowMenu(false)} 
+          onLogout={handleLogout} 
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+          onNavigate={setView}
+        />
+      )}
       
       <AnimatePresence mode="wait">
         {view === 'landing' && (
@@ -492,7 +546,7 @@ export default function App() {
           <AuthPage key="auth" mode={view as 'login' | 'signup'} onAuth={handleAuth} onGoogleAuth={handleGoogleAuth} />
         )}
         
-        {(view === 'feed' || view === 'gili-vibes' || view === 'friends' || view === 'notification' || view === 'profile') && (
+        {(view === 'feed' || view === 'friends' || view === 'notification' || view === 'profile' || view === 'settings' || view === 'lost-found' || view === 'marketplace' || view === 'community') && (
           <motion.main 
             key="main"
             initial={{ opacity: 0 }}
@@ -502,10 +556,13 @@ export default function App() {
             {/* Left Sidebar / Nav */}
             <div className="hidden md:flex flex-col gap-2 w-20 lg:w-64">
               {[
-                { id: 'feed', icon: Home, label: 'Feed' },
-                { id: 'gili-vibes', icon: Camera, label: 'Gili Vibes' },
-                { id: 'friends', icon: Users, label: 'Friends' },
-                { id: 'profile', icon: UserIcon, label: 'Profile' }
+                { id: 'feed', icon: Home, label: t.home },
+                { id: 'map', icon: Camera, label: 'Map' },
+                { id: 'friends', icon: Users, label: t.friends },
+                { id: 'profile', icon: UserIcon, label: t.profile },
+                { id: 'lost-found', icon: Search, label: 'Lost & Found' },
+                { id: 'marketplace', icon: ShoppingBag, label: 'Marketplace' },
+                { id: 'community', icon: Users, label: 'Community' }
               ].map(item => (
                 <button
                   key={item.id}
@@ -526,7 +583,7 @@ export default function App() {
                   className={`flex items-center gap-4 p-4 rounded-xl transition-all ${view === 'admin' ? 'bg-red-500/10 text-red-500' : 'hover:bg-border/50 text-secondary'}`}
                 >
                   <Users className="w-6 h-6" />
-                  <span className="hidden lg:block font-semibold">Admin</span>
+                  <span className="hidden lg:block font-semibold">{t.admin}</span>
                 </button>
               )}
               
@@ -535,7 +592,7 @@ export default function App() {
                 className="mt-4 flex items-center justify-center gap-4 p-4 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors"
               >
                 <PlusSquare className="w-6 h-6" />
-                <span className="hidden lg:block font-semibold">Create Post</span>
+                <span className="hidden lg:block font-semibold">{t.createPost}</span>
               </button>
             </div>
 
@@ -543,21 +600,21 @@ export default function App() {
             <div className="flex-1 max-w-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex flex-col gap-1">
-                  <h2 className="text-3xl font-bold capitalize tracking-tight">{view === 'gili-vibes' ? 'Gili Vibes' : view}</h2>
+                  <h2 className="text-3xl font-bold capitalize tracking-tight">{view === 'feed' ? t.home : view === 'profile' ? t.profile : view === 'friends' ? t.friends : view === 'notification' ? t.notifications : view === 'settings' ? t.settings : view}</h2>
                   {searchQuery && (
                     <div className="flex items-center gap-2 text-sm text-secondary">
-                      <span>Searching for: <span className="text-accent font-bold">{searchQuery}</span></span>
+                      <span>{t.searchingFor} <span className="text-accent font-bold">{searchQuery}</span></span>
                       <button 
                         onClick={() => setSearchQuery('')}
                         className="text-xs bg-surface border border-border px-2 py-0.5 rounded-full hover:bg-border/50"
                       >
-                        Clear
+                        {t.clear}
                       </button>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  {(view === 'feed' || view === 'gili-vibes') && (
+                  {view === 'feed' && (
                     <div className="flex items-center gap-2">
                       <div className="relative hidden sm:block">
                         <input
@@ -574,13 +631,13 @@ export default function App() {
                           onClick={() => setSortBy('latest')}
                           className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${sortBy === 'latest' ? 'bg-background shadow-sm text-primary' : 'text-secondary hover:text-primary'}`}
                         >
-                          Latest
+                          {t.latest}
                         </button>
                         <button 
                           onClick={() => setSortBy('likes')}
                           className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${sortBy === 'likes' ? 'bg-background shadow-sm text-primary' : 'text-secondary hover:text-primary'}`}
                         >
-                          Top
+                          {t.top}
                         </button>
                       </div>
 
@@ -640,9 +697,28 @@ export default function App() {
                 </div>
               </div>
 
-              {(view === 'feed' || view === 'gili-vibes') && (
+              {view === 'settings' && (
+                <SettingsView 
+                  user={user} 
+                  onLogout={handleLogout} 
+                  onNavigate={setView}
+                  onEditProfile={() => setShowEditModal(true)}
+                  language={language}
+                  onLanguageChange={setLanguage}
+                />
+              )}
+              {view === 'map' && (
+                <div className="p-6">
+                  <GiliMap />
+                </div>
+              )}
+              {view === 'lost-found' && <LostFoundView />}
+              {view === 'marketplace' && <MarketplaceView />}
+              {view === 'community' && <CommunityView user={user} />}
+
+              {view === 'feed' && (
                 <div className="space-y-6">
-                  {view === 'feed' && <TouristWidgets />}
+                  <TouristWidgets language={language} />
                   {/* Post Trigger */}
                   {user && (
                     <div 
@@ -651,7 +727,7 @@ export default function App() {
                     >
                       <img src={user.profilePictureUrl || user.avatar} alt={user.displayName || user.name || user.username} className="w-10 h-10 rounded-full border border-border" referrerPolicy="no-referrer" />
                       <div className="flex-1 bg-background border border-border rounded-full px-5 py-2.5 text-secondary text-sm group-hover:border-accent/50 transition-colors">
-                        What's happening on Gili T?
+                        {t.whatHappening}
                       </div>
                       <PlusSquare className="w-5 h-5 text-accent opacity-50 group-hover:opacity-100 transition-opacity" />
                     </div>
@@ -663,7 +739,6 @@ export default function App() {
                     </div>
                   ) : posts.filter(p => {
                     if (p.parentId) return false;
-                    if (view === 'gili-vibes') return p.category === 'Gili Vibes';
                     if (selectedCategory !== 'All') return p.category === selectedCategory;
                     if (searchQuery) {
                       const query = searchQuery.toLowerCase();
@@ -684,7 +759,6 @@ export default function App() {
                     >
                       {posts.filter(p => {
                         if (p.parentId) return false;
-                        if (view === 'gili-vibes') return p.category === 'Gili Vibes';
                         if (selectedCategory !== 'All') return p.category === selectedCategory;
                         if (searchQuery) {
                           const query = searchQuery.toLowerCase();
@@ -714,13 +788,14 @@ export default function App() {
                             onUserClick={handleUserClick}
                             setNotification={setNotification}
                             onHashtagClick={handleHashtagClick}
+                            language={language}
                           />
                         </motion.div>
                       ))}
                     </motion.div>
                   ) : (
                     <div className="text-center py-20 text-secondary">
-                      <p className="mb-4">No updates yet. Be the first to share!</p>
+                      <p className="mb-4">{t.noUpdates}</p>
                     </div>
                   )}
                 </div>
@@ -741,13 +816,44 @@ export default function App() {
                   allPosts={posts}
                   setNotification={setNotification}
                   onHashtagClick={handleHashtagClick}
+                  showEditModal={showEditModal}
+                  setShowEditModal={setShowEditModal}
+                  language={language}
                 />
               )}
               {view === 'notification' && (
-                <NotificationsView notifications={notifications} />
+                <NotificationsView notifications={notifications} language={language} />
+              )}
+              {view === 'friends' && (
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold px-4">{t.friends}</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-4">
+                    {suggestedUsers.map(sUser => (
+                      <div key={sUser.id} className="card p-4 flex items-center gap-4">
+                        <img 
+                          src={sUser.profilePictureUrl || sUser.avatar} 
+                          alt={sUser.username} 
+                          className="w-12 h-12 rounded-full object-cover cursor-pointer"
+                          onClick={() => handleUserClick(sUser.id)}
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-bold cursor-pointer" onClick={() => handleUserClick(sUser.id)}>{sUser.displayName || sUser.username}</h4>
+                          <p className="text-xs text-secondary">@{sUser.username}</p>
+                        </div>
+                        <button 
+                          onClick={() => handleFollow(sUser.id)}
+                          className="px-4 py-1.5 bg-accent text-white rounded-full text-xs font-bold hover:bg-accent/90"
+                        >
+                          {t.follow}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
               {view === 'events' && (
-                <EventsView user={user} setNotification={setNotification} />
+                <EventsView user={user} setNotification={setNotification} language={language} />
               )}
             </div>
 
@@ -755,6 +861,7 @@ export default function App() {
             <Sidebar 
               suggestedUsers={suggestedUsers}
               onUserClick={handleUserClick}
+              language={language}
             />
           </motion.main>
         )}
@@ -771,13 +878,14 @@ export default function App() {
         onCategoryChange={setNewPostCategory}
         user={user}
         setNotification={setNotification}
+        language={language}
         onSubmit={async (location) => {
           await handleCreatePost(newPostContent, newPostImage, newPostCategory, undefined, location);
           setNewPostContent('');
           setNewPostImage('');
           setNewPostCategory('Gili Vibes');
           setShowCreateModal(false);
-          setNotification({ message: 'Post created successfully!', type: 'success' });
+          setNotification({ message: language === 'id' ? 'Postingan berhasil dibuat!' : 'Post created successfully!', type: 'success' });
         }}
       />
 
@@ -797,11 +905,11 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="card w-full max-w-sm rounded-3xl relative z-10 p-6"
             >
-              <h3 className="text-lg font-bold text-primary mb-4">Report Post</h3>
+              <h3 className="text-lg font-bold text-primary mb-4">{t.reportPost}</h3>
               <textarea
                 value={reportReason}
                 onChange={(e) => setReportReason(e.target.value)}
-                placeholder="Why are you reporting this post?"
+                placeholder={language === 'id' ? 'Mengapa Anda melaporkan postingan ini?' : 'Why are you reporting this post?'}
                 className="w-full bg-background border border-border rounded-xl p-3 mb-4 text-sm focus:outline-none focus:border-accent min-h-[100px] resize-none"
               />
               <div className="flex justify-end gap-2">
@@ -809,62 +917,30 @@ export default function App() {
                   onClick={() => setShowReportModal({ show: false, postId: null })}
                   className="px-4 py-2 text-sm font-semibold text-secondary hover:text-primary"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button 
                   onClick={() => showReportModal.postId && handleReportPost(showReportModal.postId, reportReason)}
                   disabled={!reportReason.trim()}
                   className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
                 >
-                  Report
+                  {language === 'id' ? 'Laporkan' : 'Report'}
                 </button>
               </div>
             </motion.div>
           </div>
         )}
-        {view === 'admin' && user?.role === 'Admin' && (
+        {(view === 'admin' && (user?.role === 'Admin' || user?.role === 'Moderator')) && (
           <motion.main
             key="admin"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="max-w-4xl mx-auto px-4 pt-24"
           >
-            <AdminSettings />
+            <AdminSettings currentUser={user} />
           </motion.main>
         )}
       </AnimatePresence>
-
-      {/* Mobile Nav */}
-      {user && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border px-6 py-3 flex items-center justify-between z-50">
-          {[
-            { id: 'feed', icon: Home },
-            { id: 'gili-vibes', icon: Camera },
-            { id: 'events', icon: Calendar },
-            { id: 'friends', icon: Users },
-            { id: 'profile', icon: UserIcon }
-          ].map(item => (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (item.id === 'profile') setSelectedUser(user);
-                setView(item.id);
-              }}
-              className={`p-2 rounded-xl transition-all ${view === item.id ? 'text-accent bg-accent/10' : 'text-secondary'}`}
-            >
-              <item.icon className="w-6 h-6" />
-            </button>
-          ))}
-          {user.role === 'Admin' && (
-            <button
-              onClick={() => setView('admin')}
-              className={`p-2 rounded-xl transition-all ${view === 'admin' ? 'text-red-500 bg-red-500/10' : 'text-secondary'}`}
-            >
-              <Shield className="w-6 h-6" />
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Notification Toast */}
       {notification && (
@@ -880,7 +956,14 @@ export default function App() {
         </motion.div>
       )}
       {user && view !== 'landing' && view !== 'login' && view !== 'signup' && (
-        <BottomNav activeTab={view} onNavigate={setView} notifications={notifications} />
+        <BottomNav 
+          activeTab={view} 
+          onNavigate={(v) => {
+            if (v === 'profile') setSelectedUser(user);
+            setView(v);
+          }} 
+          notifications={notifications} 
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Camera, MapPin, AlignLeft, Upload, Loader2 } from 'lucide-react';
 import { User } from '../types';
 import { uploadFile } from '../services/storageService';
+import ImageCropper from './ImageCropper';
 
 interface EditProfileModalProps {
   show: boolean;
@@ -29,6 +30,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [cropType, setCropType] = useState<'avatar' | 'cover' | null>(null);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -39,22 +42,39 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
     // Basic validation
     if (!file.type.startsWith('image/')) {
-      setNotification({ message: 'Please upload an image file.', type: 'error' });
+      setNotification({ message: 'Silakan unggah file gambar.', type: 'error' });
       return;
     }
 
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImageToCrop(e.target?.result as string);
+      setCropType(type);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedImage: string) => {
+    setImageToCrop(null);
+    const type = cropType!;
+    setCropType(null);
+    
     try {
       if (type === 'cover') setUploadingCover(true);
       else setUploadingAvatar(true);
 
+      // Convert base64 to blob for upload
+      const response = await fetch(croppedImage);
+      const blob = await response.blob();
+      const file = new File([blob], `${type}.jpg`, { type: 'image/jpeg' });
       const url = await uploadFile(file);
       
       if (type === 'cover') setCoverImage(url);
       else setAvatar(url);
-      setNotification({ message: `Successfully uploaded ${type}.`, type: 'success' });
+      setNotification({ message: `Berhasil mengunggah ${type === 'cover' ? 'sampul' : 'avatar'}.`, type: 'success' });
     } catch (error) {
       console.error(`Error uploading ${type}:`, error);
-      setNotification({ message: error instanceof Error ? error.message : `Failed to upload ${type}.`, type: 'error' });
+      setNotification({ message: error instanceof Error ? error.message : `Gagal mengunggah ${type === 'cover' ? 'sampul' : 'avatar'}.`, type: 'error' });
     } finally {
       if (type === 'cover') setUploadingCover(false);
       else setUploadingAvatar(false);
@@ -74,11 +94,11 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
         giliConnection,
         interests: interests.split(',').map(i => i.trim()).filter(i => i !== '')
       });
-      setNotification({ message: 'Profile updated successfully!', type: 'success' });
+      setNotification({ message: 'Profil berhasil diperbarui!', type: 'success' });
       onClose();
     } catch (error) {
       console.error("Error updating profile:", error);
-      setNotification({ message: 'Failed to update profile.', type: 'error' });
+      setNotification({ message: 'Gagal memperbarui profil.', type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -88,6 +108,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
     <AnimatePresence>
       {show && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {imageToCrop && (
+            <ImageCropper
+              image={imageToCrop}
+              onCropComplete={handleCropComplete}
+              onCancel={() => { setImageToCrop(null); setCropType(null); }}
+            />
+          )}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -102,14 +129,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
             className="card w-full max-w-lg rounded-3xl relative z-10 overflow-hidden"
           >
             <div className="flex items-center justify-between p-6 border-b border-border">
-              <h3 className="text-xl font-bold text-primary">Edit Profile</h3>
+              <h3 className="text-xl font-bold text-primary">Edit Profil</h3>
               <button onClick={onClose} className="p-2 hover:bg-border/50 rounded-lg text-secondary"><X className="w-5 h-5" /></button>
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Cover Image */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Cover Image</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Foto Sampul</label>
                 <div 
                   onClick={() => coverInputRef.current?.click()}
                   className="relative h-32 bg-background rounded-2xl overflow-hidden border border-border group cursor-pointer"
@@ -127,7 +154,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                     ) : (
                       <>
                         <Upload className="w-6 h-6 text-white" />
-                        <span className="text-[10px] font-semibold text-white uppercase">Upload Cover</span>
+                        <span className="text-[10px] font-semibold text-white uppercase">Unggah Sampul</span>
                       </>
                     )}
                   </div>
@@ -175,7 +202,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               {/* Name */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Display Name</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Nama Tampilan</label>
                 <input 
                   type="text"
                   value={name}
@@ -187,13 +214,18 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               {/* Bio */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Bio</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-semibold text-secondary uppercase">Bio</label>
+                  <span className={`text-[10px] font-bold ${bio.length > 160 ? 'text-red-500' : 'text-secondary'}`}>
+                    {bio.length}/160
+                  </span>
+                </div>
                 <div className="relative">
                   <AlignLeft className="absolute left-4 top-4 w-4 h-4 text-secondary" />
                   <textarea 
                     value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="Tell us about yourself..."
+                    onChange={(e) => setBio(e.target.value.slice(0, 160))}
+                    placeholder="Ceritakan tentang diri Anda..."
                     className="w-full h-24 bg-background border border-border rounded-xl pl-12 pr-4 py-3 focus:border-accent outline-none transition-colors resize-none text-primary"
                   />
                 </div>
@@ -201,14 +233,14 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               {/* Location */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Location</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Lokasi</label>
                 <div className="relative">
                   <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
                   <input 
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Gili Trawangan, Indonesia"
+                    placeholder="misal: Gili Trawangan, Indonesia"
                     className="w-full bg-background border border-border rounded-xl pl-12 pr-4 py-3 focus:border-accent outline-none transition-colors text-primary"
                   />
                 </div>
@@ -216,26 +248,62 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
               {/* Gili Connection */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Connection to Gili Trawangan</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Hubungan dengan Gili Trawangan</label>
                 <select 
                   value={giliConnection}
                   onChange={(e) => setGiliConnection(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 focus:border-accent outline-none transition-colors text-primary"
                 >
-                  <option value="">Select your connection...</option>
-                  <option value="Local Resident">Local Resident</option>
-                  <option value="Expat Resident">Expat Resident</option>
-                  <option value="Frequent Visitor">Frequent Visitor</option>
-                  <option value="First Time Visitor">First Time Visitor</option>
-                  <option value="Business Owner">Business Owner</option>
+                  <option value="">Pilih hubungan Anda...</option>
+                  <option value="Local Resident">Penduduk Lokal (Asli Gili)</option>
+                  <option value="Expat Resident">Penduduk Ekspatriat (Tinggal di Gili)</option>
+                  <option value="Frequent Visitor">Sering Berkunjung (Sering ke Gili)</option>
+                  <option value="First Time Visitor">Pengunjung Pertama Kali (Pertama kali)</option>
+                  <option value="Business Owner">Pemilik Bisnis (Pemilik Bisnis)</option>
                   <option value="Digital Nomad">Digital Nomad</option>
-                  <option value="Diving Professional">Diving Professional</option>
+                  <option value="Diving Professional">Profesional Diving</option>
+                  <option value="Boat Crew">Kru Kapal / Kapten</option>
+                  <option value="Hospitality Staff">Staf Perhotelan</option>
                 </select>
               </div>
 
               {/* Interests */}
               <div>
-                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Interests (comma separated)</label>
+                <label className="block text-xs font-semibold text-secondary uppercase mb-2">Minat (Pisahkan dengan koma)</label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {['Diving', 'Surfing', 'Yoga', 'Partying', 'Foodie', 'Sunset', 'Snorkeling', 'Digital Nomad'].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        const current = interests.split(',').map(i => i.trim()).filter(i => i !== '');
+                        if (!current.includes(tag)) {
+                          setInterests(interests ? `${interests}, ${tag}` : tag);
+                        }
+                      }}
+                      className="px-2 py-1 bg-secondary/5 text-secondary text-[10px] font-bold rounded-lg border border-border hover:border-accent hover:text-accent transition-colors"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {interests.split(',').map((i, idx) => i.trim() && (
+                    <span key={idx} className="px-2 py-1 bg-accent/10 text-accent text-[10px] font-bold rounded-lg border border-accent/20 flex items-center gap-1">
+                      #{i.trim()}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const current = interests.split(',').map(item => item.trim()).filter(item => item !== '' && item !== i.trim());
+                          setInterests(current.join(', '));
+                        }}
+                        className="hover:text-red-500"
+                      >
+                        <X className="w-2 h-2" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <input 
                   type="text"
                   value={interests}
@@ -250,7 +318,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 disabled={isSubmitting}
                 className="w-full btn-primary py-4 rounded-xl font-semibold"
               >
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>
             </form>
           </motion.div>

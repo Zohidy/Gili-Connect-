@@ -18,32 +18,26 @@
 }
 
 :root {
-  /* Warm, island-inspired palette */
-  --background: #fdfcf8; /* Soft sand */
+  /* Neobrutalism Palette */
+  --background: #fcfcfc;
   --surface: #ffffff;
-  --primary: #1a2e35; /* Deep ocean */
-  --secondary: #5a6e75; /* Muted sea */
-  --border: #e2e8f0;
-  --accent: #d97706; /* Warm sunset/sand accent */
-
-  --success-bg: #dcfce7;
-  --success-text: #166534;
-  --error-bg: #fee2e2;
-  --error-text: #991b1b;
+  --primary: #000000;
+  --secondary: #4a4a4a;
+  --border: #000000;
+  --accent: #ff6b35; /* Vibrant Orange */
+  --accent-2: #3b82f6; /* Vibrant Blue */
+  --accent-3: #facc15; /* Vibrant Yellow */
 }
 
 .dark {
-  --background: #0f172a; /* Dark night sea */
-  --surface: #1e293b;
-  --primary: #f8fafc;
-  --secondary: #94a3b8;
-  --border: #334155;
-  --accent: #fbbf24; /* Bright sunset accent */
-
-  --success-bg: #064e3b;
-  --success-text: #34d399;
-  --error-bg: #7f1d1d;
-  --error-text: #f87171;
+  --background: #1a1a1a;
+  --surface: #2d2d2d;
+  --primary: #ffffff;
+  --secondary: #b0b0b0;
+  --border: #ffffff;
+  --accent: #ff8559;
+  --accent-2: #60a5fa;
+  --accent-3: #fde047;
 }
 
 @layer base {
@@ -52,49 +46,25 @@
   }
 }
 
-.card {
-  @apply bg-surface border border-border rounded-2xl shadow-sm;
+/* Neobrutalism Utilities */
+.neo-card {
+  @apply bg-surface border-2 border-primary shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-6;
 }
 
-.badge-success {
-  @apply bg-success-bg text-success-text;
+.dark .neo-card {
+  @apply shadow-[4px_4px_0px_0px_rgba(255,165,0,1)];
 }
 
-.badge-error {
-  @apply bg-error-bg text-error-text;
+.navbar-neo {
+  @apply bg-surface border-b-2 border-primary;
 }
 
-.badge-party { @apply bg-purple-100 text-purple-700; }
-.dark .badge-party { @apply bg-purple-900 text-purple-300; }
+.btn-primary { 
+  @apply bg-accent text-white font-bold border-2 border-primary px-6 py-2 
+         shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all; 
+}
 
-.badge-fastboat { @apply bg-blue-100 text-blue-700; }
-.dark .badge-fastboat { @apply bg-blue-900 text-blue-300; }
-
-.badge-safety { @apply bg-red-100 text-red-700; }
-.dark .badge-safety { @apply bg-red-900 text-red-300; }
-
-.badge-role-admin { @apply bg-purple-100 text-purple-700 border-purple-200; }
-.dark .badge-role-admin { @apply bg-purple-900 text-purple-300 border-purple-800; }
-
-.badge-role-moderator { @apply bg-red-100 text-red-700 border-red-200; }
-.dark .badge-role-moderator { @apply bg-red-900 text-red-300 border-red-800; }
-
-.badge-role-supporter { @apply bg-yellow-100 text-yellow-700 border-yellow-200; }
-.dark .badge-role-supporter { @apply bg-yellow-900 text-yellow-300 border-yellow-800; }
-
-.badge-role-local { @apply bg-blue-100 text-blue-700 border-blue-200; }
-.dark .badge-role-local { @apply bg-blue-900 text-blue-300 border-blue-800; }
-
-.badge-role-business { @apply bg-slate-100 text-slate-700 border-slate-200; }
-.dark .badge-role-business { @apply bg-slate-800 text-slate-300 border-slate-700; }
-
-.badge-role-tourist { @apply bg-emerald-100 text-emerald-700 border-emerald-200; }
-.dark .badge-role-tourist { @apply bg-emerald-900 text-emerald-300 border-emerald-800; }
-
-.badge-default { @apply bg-slate-100 text-slate-700; }
-.dark .badge-default { @apply bg-slate-800 text-slate-300; }
-
-.error-message { @apply bg-error-bg text-error-text; }
-
-.btn-primary { @apply bg-primary text-background hover:bg-primary/90 disabled:opacity-50 transition-colors; }
-.btn-secondary { @apply bg-surface border border-border text-secondary hover:bg-background transition-colors; }
+.btn-secondary { 
+  @apply bg-surface text-primary font-bold border-2 border-primary px-6 py-2 
+         shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all; 
+}

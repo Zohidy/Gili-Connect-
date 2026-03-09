@@ -17,6 +17,11 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
 
+    function isModerator(communityId) {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/communities/$(communityId)).data.moderators.hasAny([request.auth.uid]);
+    }
+
     // --- COLLECTIONS ---
 
     // Users collection
@@ -37,6 +42,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Communities collection
+    match /communities/{communityId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isModerator(communityId) || isOwner(resource.data.adminId);
+      allow delete: if isAdmin() || isOwner(resource.data.adminId);
+    }
+
     // Posts collection
     match /posts/{postId} {
       // Posts are public
@@ -47,7 +60,7 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid;
       
       // Update logic
-      allow update: if isAdmin() || (
+      allow update: if isAdmin() || isModerator(resource.data.communityId) || (
         isSignedIn() && (
           // Owner can update their post content, but not the userId or creation date
           (isOwner(resource.data.userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'createdAt'])) ||
@@ -56,8 +69,8 @@ service cloud.firestore {
         )
       );
       
-      // Only owner or admin can delete
-      allow delete: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+      // Only owner, admin, or moderator can delete
+      allow delete: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin() || isModerator(resource.data.communityId));
     }
 
     // Reports collection

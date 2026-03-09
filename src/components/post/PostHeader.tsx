@@ -78,7 +78,7 @@ const PostHeader: React.FC<PostHeaderProps> = ({
               <button 
                 onClick={() => setIsEditing(true)}
                 className="p-2 text-secondary hover:text-accent transition-colors rounded-full hover:bg-accent/5"
-                title="Edit post"
+                title="Edit postingan"
               >
                 <Edit2 className="w-4 h-4" />
               </button>
@@ -87,7 +87,7 @@ const PostHeader: React.FC<PostHeaderProps> = ({
               <button 
                 onClick={() => setShowDeleteConfirm(true)}
                 className="p-2 text-secondary hover:text-red-500 hover:bg-red-500/5 transition-colors rounded-full"
-                title="Delete post"
+                title="Hapus postingan"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

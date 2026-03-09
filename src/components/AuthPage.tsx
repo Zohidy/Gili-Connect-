@@ -61,7 +61,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode, onAuth, onGoogleAuth }) => {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="glass w-full max-w-md p-8 rounded-3xl relative overflow-hidden"
+        className="neo-card w-full max-w-md p-8 relative overflow-hidden"
       >
         <div className="absolute -top-20 -right-20 w-40 h-40 bg-cyan-water/10 rounded-full blur-3xl" />
         
